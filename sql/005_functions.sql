@@ -22,7 +22,9 @@ RETURNS TABLE (
   amount              NUMERIC,
   revenue_percentage  NUMERIC
 )
-LANGUAGE SQL STABLE AS $$
+LANGUAGE SQL STABLE
+SET search_path = finanzas
+AS $$
 
 WITH
   ytd_start AS (
@@ -195,7 +197,9 @@ RETURNS TABLE (
   revenue_pct_lmonth  NUMERIC,
   revenue_pct_ytd     NUMERIC
 )
-LANGUAGE SQL STABLE AS $$
+LANGUAGE SQL STABLE
+SET search_path = finanzas
+AS $$
 
   WITH
     ytd  AS (SELECT * FROM fn_pnl_ytd(p_period_month, p_company_ids)),
@@ -304,7 +308,9 @@ RETURNS TABLE (
   period_month  DATE,
   amount        NUMERIC
 )
-LANGUAGE SQL STABLE AS $$
+LANGUAGE SQL STABLE
+SET search_path = finanzas
+AS $$
 
   WITH months AS (
     SELECT generate_series(
@@ -423,7 +429,9 @@ RETURNS TABLE (
   pnl_line_label    TEXT,
   uploaded_file_id  UUID
 )
-LANGUAGE SQL STABLE AS $$
+LANGUAGE SQL STABLE
+SET search_path = finanzas
+AS $$
 
   WITH
   -- Include the line itself and its children (for subtotals)
@@ -476,7 +484,9 @@ RETURNS TABLE (
   metric_value  NUMERIC,
   metric_format TEXT
 )
-LANGUAGE SQL STABLE AS $$
+LANGUAGE SQL STABLE
+SET search_path = finanzas
+AS $$
 
   WITH pnl AS (
     SELECT line_code, SUM(amount) AS amount
