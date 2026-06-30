@@ -68,7 +68,13 @@ function toDate(raw: unknown): Date | null {
     if (!d) return null;
     return new Date(d.y, d.m - 1, d.d);
   }
-  const d = new Date(String(raw));
+  const s = String(raw).trim();
+  // DD-MM-YYYY or DD/MM/YYYY (Chilean / Latin American format)
+  const dmy = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+  if (dmy) {
+    return new Date(+dmy[3], +dmy[2] - 1, +dmy[1]);
+  }
+  const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }
 
