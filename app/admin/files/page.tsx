@@ -70,7 +70,7 @@ export default async function FilesPage() {
                       {f.original_filename as string}
                     </td>
                     <td className="px-4 py-2 text-neutral-600 whitespace-nowrap">
-                      {f.period_month ? (f.period_month as string).slice(0, 7) : "—"}
+                      {f.period_month ? new Date(f.period_month as string).toISOString().slice(0, 7) : "—"}
                     </td>
                     <td className="px-4 py-2 text-center">
                       <span className={["text-xs px-2 py-0.5 rounded-full font-medium", STATUS_COLORS[status] ?? "bg-neutral-100 text-neutral-500"].join(" ")}>
@@ -78,7 +78,7 @@ export default async function FilesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums text-neutral-600">
-                      {(f.row_count as number).toLocaleString("es-CL")}
+                      {f.row_count != null ? (f.row_count as number).toLocaleString("es-CL") : "—"}
                     </td>
                     <td className="px-4 py-2 text-neutral-500 text-xs whitespace-nowrap">
                       {new Date(f.created_at as string).toLocaleString("es-CL")}
