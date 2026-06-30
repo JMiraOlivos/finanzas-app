@@ -118,23 +118,43 @@ export function parseJournalBuffer(buffer: Buffer, filename: string): ParsedRow[
     dataRows = raw.slice(1);
     cm = colMap;
   } else {
-    // Positional fallback: assume date, code, name, description, debit, credit
-    if (raw[0].length < 5) {
-      throw new Error(
-        `No se pueden detectar columnas en ${filename}. Formato desconocido.`
-      );
+    // No headers detected. Sniff the format from the first data row.
+    const r0 = raw[0];
+    if (!r0 || r0.length < 5) {
+      throw new Error(`No se pueden detectar columnas en ${filename}. Formato desconocido.`);
     }
-    dataRows = raw;
-    cm = {
-      entryDate: 0,
-      accountCode: 1,
-      accountName: 2,
-      description: 3,
-      documentNumber: null,
-      debit: 4,
-      credit: 5,
-      amount: null,
-    };
+
+    // Format A (10 cols, no headers): fecha | tipo | ndoc | linea | glosa | cuenta_cod | cuenta_nom | debe | haber | saldo
+    // Detected when col 5 looks like a numeric account code.
+    const col5 = r0[5] !== null && r0[5] !== undefined ? String(r0[5]).trim() : "";
+    const isFormatA = r0.length >= 9 && /^\d{4,}$/.test(col5.replace(/\./g, ""));
+
+    if (isFormatA) {
+      dataRows = raw;
+      cm = {
+        entryDate:      0,
+        accountCode:    5,
+        accountName:    6,
+        description:    4,
+        documentNumber: 2,
+        debit:          7,
+        credit:         8,
+        amount:         null,
+      };
+    } else {
+      // Generic fallback: fecha | cuenta | nombre | glosa | debe | haber
+      dataRows = raw;
+      cm = {
+        entryDate:      0,
+        accountCode:    1,
+        accountName:    2,
+        description:    3,
+        documentNumber: null,
+        debit:          4,
+        credit:         5,
+        amount:         null,
+      };
+    }
   }
 
   const results: ParsedRow[] = [];
