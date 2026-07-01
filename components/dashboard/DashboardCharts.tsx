@@ -107,7 +107,7 @@ export function DashboardCharts({ monthly, expenses, companies }: ChartsData) {
                 },
                 tooltip: {
                   callbacks: {
-                    label: (ctx) => `  ${ctx.dataset.label}: ${fmtM(ctx.parsed.y)} CLP`,
+                    label: (ctx) => `  ${ctx.dataset.label}: ${fmtM(ctx.parsed.y ?? 0)} CLP`,
                   },
                 },
               },
@@ -154,7 +154,7 @@ export function DashboardCharts({ monthly, expenses, companies }: ChartsData) {
                   legend: { display: false },
                   tooltip: {
                     callbacks: {
-                      label: (ctx) => `  ${fmtM(ctx.parsed.x)} CLP`,
+                      label: (ctx) => `  ${fmtM(ctx.parsed.x ?? 0)} CLP`,
                     },
                   },
                 },
@@ -199,7 +199,7 @@ export function DashboardCharts({ monthly, expenses, companies }: ChartsData) {
                     legend: { display: false },
                     tooltip: {
                       callbacks: {
-                        label: (ctx) => `  ${fmtM(ctx.parsed.y)} CLP`,
+                        label: (ctx) => `  ${fmtM(ctx.parsed.y ?? 0)} CLP`,
                       },
                     },
                   },
