@@ -33,14 +33,18 @@ export async function GET(request: NextRequest) {
 
   const [monthlyData, ytdData] = await Promise.all([
     allowedIds === null
-      ? sql`SELECT line_code, period_month, SUM(amount) AS amount
-            FROM finanzas.fn_pnl_monthly(${year}, NULL)
+      ? sql`SELECT line_code,
+                   EXTRACT(MONTH FROM period_month)::int AS month_num,
+                   SUM(amount) AS amount
+            FROM (SELECT * FROM finanzas.fn_pnl_monthly(${year}, NULL)) AS sub
             WHERE line_code IN ('INGRESOS','EBITDA')
-            GROUP BY line_code, period_month`
-      : sql`SELECT line_code, period_month, SUM(amount) AS amount
-            FROM finanzas.fn_pnl_monthly(${year}, ${allowedIds}::uuid[])
+            GROUP BY line_code, month_num`
+      : sql`SELECT line_code,
+                   EXTRACT(MONTH FROM period_month)::int AS month_num,
+                   SUM(amount) AS amount
+            FROM (SELECT * FROM finanzas.fn_pnl_monthly(${year}, ${allowedIds}::uuid[])) AS sub
             WHERE line_code IN ('INGRESOS','EBITDA')
-            GROUP BY line_code, period_month`,
+            GROUP BY line_code, month_num`,
     allowedIds === null
       ? sql`SELECT company_id, company_name, line_code, amount
             FROM finanzas.fn_pnl_ytd(${period}::date, NULL)
@@ -58,7 +62,7 @@ export async function GET(request: NextRequest) {
     byMonth.set(String(m).padStart(2, "0"), { revenue: 0, ebitda: 0 });
   }
   for (const row of monthlyData) {
-    const month = String(row.period_month).slice(5, 7);
+    const month = String(Number(row.month_num)).padStart(2, "0");
     const amount = Number(row.amount) || 0;
     const entry = byMonth.get(month);
     if (!entry) continue;

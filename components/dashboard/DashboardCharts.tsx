@@ -65,7 +65,7 @@ export function DashboardCharts({ monthly, expenses, companies }: ChartsData) {
         <p className="text-[10px] font-body uppercase tracking-[0.1em] text-ev-gray3 mb-4">
           Tendencia Mensual
         </p>
-        <div className="h-56">
+        <div className="relative h-56">
           <Line
             data={{
               labels: monthly.labels,
@@ -135,7 +135,7 @@ export function DashboardCharts({ monthly, expenses, companies }: ChartsData) {
           <p className="text-[10px] font-body uppercase tracking-[0.1em] text-ev-gray3 mb-4">
             Estructura de Gastos YTD
           </p>
-          <div className="h-56">
+          <div className="relative h-56">
             <Bar
               data={{
                 labels: expenses.labels,
@@ -181,7 +181,7 @@ export function DashboardCharts({ monthly, expenses, companies }: ChartsData) {
             <p className="text-[10px] font-body uppercase tracking-[0.1em] text-ev-gray3 mb-4">
               Ingresos por Empresa YTD
             </p>
-            <div className="h-56">
+            <div className="relative h-56">
               <Bar
                 data={{
                   labels: companies.map((c) => c.name.replace("E&V ", "")),
