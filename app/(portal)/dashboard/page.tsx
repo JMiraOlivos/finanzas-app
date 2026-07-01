@@ -1,15 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { KpiCard } from "@/components/dashboard/KpiCard";
-import { KpiMetric } from "@/lib/eerr";
+import { ScenarioKpiCard } from "@/components/dashboard/ScenarioKpiCard";
+import { AlertsPanel, type Alert } from "@/components/dashboard/AlertsPanel";
+import { CompanyRanking, type CompanyRankingRow } from "@/components/dashboard/CompanyRanking";
 import type { ChartsData } from "@/components/dashboard/DashboardCharts";
 
 const DashboardCharts = dynamic(
   () => import("@/components/dashboard/DashboardCharts").then((m) => ({ default: m.DashboardCharts })),
   { ssr: false }
 );
+
+type KpiMetric = {
+  code: string;
+  label: string;
+  value: number | null;
+  format: string;
+};
+
+const FEATURED_CODES = ["INGRESOS_YTD", "EBITDA_YTD", "EBITDA_MARGIN_YTD", "RESULTADO_FINAL_YTD"];
+
+const VS_PRIOR_MAP: Record<string, string> = {
+  INGRESOS_YTD: "REVENUE_VS_PRIOR_PCT",
+  EBITDA_YTD:   "EBITDA_VS_PRIOR_PCT",
+};
+const VS_BUDGET_MAP: Record<string, string> = {
+  INGRESOS_YTD: "REVENUE_VS_BUDGET_PCT",
+  EBITDA_YTD:   "EBITDA_VS_BUDGET_PCT",
+};
 
 function defaultPeriod() {
   const now = new Date();
@@ -19,27 +38,28 @@ function defaultPeriod() {
 }
 
 export default function DashboardPage() {
-  const [period,       setPeriod]       = useState(defaultPeriod);
-  const [kpis,         setKpis]         = useState<KpiMetric[]>([]);
-  const [chartsData,   setChartsData]   = useState<ChartsData | null>(null);
-  const [kpisLoading,  setKpisLoading]  = useState(true);
-  const [chartsLoading, setChartsLoading] = useState(true);
-  const [error,        setError]        = useState<string | null>(null);
+  const [period,         setPeriod]         = useState(defaultPeriod);
+  const [kpis,           setKpis]           = useState<KpiMetric[]>([]);
+  const [chartsData,     setChartsData]     = useState<ChartsData | null>(null);
+  const [ranking,        setRanking]        = useState<CompanyRankingRow[]>([]);
+  const [alerts,         setAlerts]         = useState<Alert[]>([]);
+  const [kpisLoading,    setKpisLoading]    = useState(true);
+  const [chartsLoading,  setChartsLoading]  = useState(true);
+  const [rankingLoading, setRankingLoading] = useState(true);
+  const [alertsLoading,  setAlertsLoading]  = useState(true);
+  const [error,          setError]          = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchKpis = useCallback(() => {
     setKpisLoading(true);
     setError(null);
     fetch(`/api/dashboard?period=${period}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`Error ${r.status}`);
-        return r.json() as Promise<KpiMetric[]>;
-      })
+      .then((r) => { if (!r.ok) throw new Error(`Error ${r.status}`); return r.json() as Promise<KpiMetric[]>; })
       .then(setKpis)
-      .catch((e) => setError(e.message))
+      .catch((e: Error) => setError(e.message))
       .finally(() => setKpisLoading(false));
   }, [period]);
 
-  useEffect(() => {
+  const fetchCharts = useCallback(() => {
     setChartsLoading(true);
     fetch(`/api/dashboard/charts?period=${period}`)
       .then((r) => r.json() as Promise<ChartsData>)
@@ -48,12 +68,46 @@ export default function DashboardPage() {
       .finally(() => setChartsLoading(false));
   }, [period]);
 
+  const fetchRanking = useCallback(() => {
+    setRankingLoading(true);
+    fetch(`/api/dashboard/ranking?period=${period}`)
+      .then((r) => r.json() as Promise<CompanyRankingRow[]>)
+      .then(setRanking)
+      .catch(() => {})
+      .finally(() => setRankingLoading(false));
+  }, [period]);
+
+  const fetchAlerts = useCallback(() => {
+    setAlertsLoading(true);
+    fetch(`/api/dashboard/alerts?period=${period}`)
+      .then((r) => r.json() as Promise<Alert[]>)
+      .then(setAlerts)
+      .catch(() => {})
+      .finally(() => setAlertsLoading(false));
+  }, [period]);
+
+  useEffect(() => { fetchKpis(); }, [fetchKpis]);
+  useEffect(() => { fetchCharts(); }, [fetchCharts]);
+  useEffect(() => { fetchRanking(); }, [fetchRanking]);
+  useEffect(() => { fetchAlerts(); }, [fetchAlerts]);
+
+  const kpiMap = Object.fromEntries(kpis.map((k) => [k.code, k]));
+
+  // Cards: secondary KPIs (not in FEATURED_CODES and not the vs/attain metrics)
+  const secondaryKpis = kpis.filter(
+    (k) => !FEATURED_CODES.includes(k.code) &&
+            !Object.values(VS_PRIOR_MAP).includes(k.code) &&
+            !Object.values(VS_BUDGET_MAP).includes(k.code) &&
+            k.code !== "EBITDA_BUDGET_ATTAIN"
+  );
+
   return (
     <div className="space-y-6">
-      {/* Header */}
+
+      {/* ── Header + Period Selector ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-head text-ev-black">Dashboard</h1>
+          <h1 className="text-2xl font-head text-ev-black">Dashboard Ejecutivo</h1>
           <p className="text-xs font-body uppercase tracking-[0.1em] text-ev-gray3 mt-1">KPIs consolidados</p>
         </div>
         <input
@@ -74,17 +128,35 @@ export default function DashboardPage() {
         <div className="border border-ev-red/30 bg-ev-beige1 px-4 py-3 text-sm text-ev-darkred font-body">{error}</div>
       )}
 
-      {/* KPI cards */}
+      {/* ── Bloque 1: Performance KPIs ── */}
       {kpisLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="border border-ev-gray7 bg-white p-5 animate-pulse h-24" />
-          ))}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[0,1,2,3].map((i) => <div key={i} className="border border-ev-gray7 bg-white p-5 h-28 animate-pulse" />)}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {kpis.map((k) => (
-            <KpiCard
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {FEATURED_CODES.map((code) => {
+            const k = kpiMap[code];
+            if (!k) return null;
+            return (
+              <ScenarioKpiCard
+                key={code}
+                label={k.label}
+                value={k.value}
+                format={k.format as "currency" | "percentage" | "number"}
+                vsPriorPct={VS_PRIOR_MAP[code]  ? kpiMap[VS_PRIOR_MAP[code]]?.value  : undefined}
+                vsBudgetPct={VS_BUDGET_MAP[code] ? kpiMap[VS_BUDGET_MAP[code]]?.value : undefined}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Secondary KPIs if any (e.g. monthly metrics) */}
+      {!kpisLoading && secondaryKpis.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {secondaryKpis.map((k) => (
+            <ScenarioKpiCard
               key={k.code}
               label={k.label}
               value={k.value}
@@ -94,7 +166,56 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Charts */}
+      {/* ── Bloque 2: Alertas + Calidad de datos ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <AlertsPanel alerts={alerts} loading={alertsLoading} />
+
+        {/* Data Quality summary card */}
+        <div className="border border-ev-gray7 bg-white p-5 space-y-3">
+          <p className="text-[10px] font-body uppercase tracking-[0.1em] text-ev-gray3">Calidad de datos</p>
+          {kpisLoading ? (
+            <div className="space-y-2">
+              {[1,2,3].map((i) => <div key={i} className="h-6 bg-neutral-100 animate-pulse rounded" />)}
+            </div>
+          ) : (
+            <div className="space-y-2 pt-1">
+              {(() => {
+                const attain = kpiMap["EBITDA_BUDGET_ATTAIN"]?.value;
+                const budgetEbitda = kpiMap["EBITDA_VS_BUDGET_PCT"]?.value;
+                return (
+                  <>
+                    <div className="flex justify-between text-sm font-body">
+                      <span className="text-ev-gray3">Cumplimiento ppto. EBITDA</span>
+                      <span className={["font-medium tabular-nums", attain != null && attain < 0.9 ? "text-ev-red" : "text-ev-black"].join(" ")}>
+                        {attain != null ? `${Math.round(attain * 100)}%` : "—"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm font-body">
+                      <span className="text-ev-gray3">EBITDA vs ppto.</span>
+                      <span className={["font-medium tabular-nums", budgetEbitda != null && budgetEbitda < 0 ? "text-ev-red" : "text-ev-black"].join(" ")}>
+                        {budgetEbitda != null ? `${budgetEbitda >= 0 ? "+" : ""}${Math.round(budgetEbitda * 100)}%` : "—"}
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-ev-gray7">
+                      <a
+                        href="/admin/control"
+                        className="text-xs font-body text-ev-gray3 underline underline-offset-2 hover:text-ev-black"
+                      >
+                        Ver centro de control →
+                      </a>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Bloque 3: Ranking empresas ── */}
+      <CompanyRanking rows={ranking} loading={rankingLoading} />
+
+      {/* ── Bloque 4 & 5: Charts ── */}
       {chartsLoading ? (
         <div className="space-y-4">
           <div className="border border-ev-gray7 bg-white h-72 animate-pulse" />
@@ -106,6 +227,7 @@ export default function DashboardPage() {
       ) : chartsData ? (
         <DashboardCharts {...chartsData} />
       ) : null}
+
     </div>
   );
 }
