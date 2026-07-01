@@ -263,7 +263,7 @@ export async function GET(request: NextRequest) {
           WHERE c.is_active = TRUE AND c.id = ANY(${allowedIds}::uuid[])
           ORDER BY c.name`,
 
-    // P&L table: keep fn_pnl_ytd — TODO(eerr-migration): migrar a fct_pnl_monthly cuando se valide column mapping
+    // P&L table: fn_pnl_ytd now reads from fct_pnl_monthly internally (012_pnl_functions_v2.sql)
     allowedIds === null
       ? sql`SELECT line_code, line_label, line_type, is_bold, SUM(amount) AS amount FROM finanzas.fn_pnl_ytd(${period}::date, NULL) GROUP BY line_code, line_label, line_type, is_bold, sort_order ORDER BY sort_order`
       : sql`SELECT line_code, line_label, line_type, is_bold, SUM(amount) AS amount FROM finanzas.fn_pnl_ytd(${period}::date, ${allowedIds}::uuid[]) GROUP BY line_code, line_label, line_type, is_bold, sort_order ORDER BY sort_order`,
