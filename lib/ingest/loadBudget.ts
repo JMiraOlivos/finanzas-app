@@ -173,7 +173,17 @@ export async function loadBudgetFile(params: {
 
       // If all mapped, commit to budget_monthly immediately
       if (unmappedSet.size === 0) {
-        await commitStagingToMonthly(tx, versionMap, parsed.rows, companyMap, resolveMapping);
+        const values = buildBudgetMonthlyValues(parsed.rows, companyMap, versionMap, resolveMapping);
+        const BATCH2 = 500;
+        for (let i = 0; i < values.length; i += BATCH2) {
+          const batch = values.slice(i, i + BATCH2);
+          await tx`
+            INSERT INTO finanzas.budget_monthly
+              ${tx(batch, ["version_id", "company_id", "pnl_line_id", "period_month", "amount"])}
+            ON CONFLICT (version_id, company_id, pnl_line_id, period_month)
+            DO UPDATE SET amount = EXCLUDED.amount
+          `;
+        }
       }
 
       return { versionIds: createdVersions.map((v) => v.id), unmapped: [...unmappedSet] };
@@ -219,49 +229,31 @@ export async function loadBudgetFile(params: {
   }
 }
 
-// Aggregates staging rows into budget_monthly using resolved mappings.
-// Called both from loadBudgetFile (when all mapped) and from the mappings API.
-export async function commitStagingToMonthly(
-  tx: typeof sql,
-  versionMap: Map<string, string>,
-  rows: Array<{ companyName: string; periodMonth: string; accountName: string; amount: number }>,
+// Pure aggregation helper — no SQL, usable inside or outside a transaction.
+export function buildBudgetMonthlyValues(
+  rows: Array<{ companyName?: string; accountName: string; periodMonth: string; amount: number; company_id?: string }>,
   companyMap: Map<string, string>,
+  versionMap: Map<string, string>,
   resolveMapping: (accountName: string, companyId: string) => string | null
-): Promise<void> {
-  // Aggregate: company + period + pnl_line → sum
-  const agg = new Map<string, { versionId: string; companyId: string; pnlLineId: string; periodMonth: string; amount: number }>();
+): Array<{ version_id: string; company_id: string; pnl_line_id: string; period_month: string; amount: number }> {
+  const agg = new Map<string, { version_id: string; company_id: string; pnl_line_id: string; period_month: string; amount: number }>();
 
   for (const row of rows) {
-    const companyId  = companyMap.get(row.companyName.toLowerCase())!;
-    const pnlLineId  = resolveMapping(row.accountName, companyId);
-    if (!pnlLineId) continue; // skip unmapped
-    const year       = parseInt(row.periodMonth.slice(0, 4), 10);
-    const versionId  = versionMap.get(`${companyId}:${year}`)!;
-    const key        = `${versionId}|${companyId}|${pnlLineId}|${row.periodMonth}`;
-    const existing   = agg.get(key);
+    const companyId = row.company_id ?? companyMap.get(row.companyName!.toLowerCase());
+    if (!companyId) continue;
+    const pnlLineId = resolveMapping(row.accountName, companyId);
+    if (!pnlLineId) continue;
+    const year      = parseInt(row.periodMonth.slice(0, 4), 10);
+    const versionId = versionMap.get(`${companyId}:${year}`);
+    if (!versionId) continue;
+    const key       = `${versionId}|${companyId}|${pnlLineId}|${row.periodMonth}`;
+    const existing  = agg.get(key);
     if (existing) {
       existing.amount += row.amount;
     } else {
-      agg.set(key, { versionId, companyId, pnlLineId, periodMonth: row.periodMonth, amount: row.amount });
+      agg.set(key, { version_id: versionId, company_id: companyId, pnl_line_id: pnlLineId, period_month: row.periodMonth, amount: row.amount });
     }
   }
 
-  const values = Array.from(agg.values()).map((v) => ({
-    version_id:   v.versionId,
-    company_id:   v.companyId,
-    pnl_line_id:  v.pnlLineId,
-    period_month: v.periodMonth,
-    amount:       v.amount,
-  }));
-
-  const BATCH = 500;
-  for (let i = 0; i < values.length; i += BATCH) {
-    const batch = values.slice(i, i + BATCH);
-    await tx`
-      INSERT INTO finanzas.budget_monthly
-        ${tx(batch, ["version_id", "company_id", "pnl_line_id", "period_month", "amount"])}
-      ON CONFLICT (version_id, company_id, pnl_line_id, period_month)
-      DO UPDATE SET amount = EXCLUDED.amount
-    `;
-  }
+  return Array.from(agg.values());
 }

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { sql } from "@/lib/db";
 import { triggerDbtRun } from "@/lib/dbt";
+import { buildBudgetMonthlyValues } from "@/lib/ingest/loadBudget";
 
 // GET /api/budget/mappings?versionId=X
 // Returns unique account names in staging for that version, with mapping status.
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
         throw new Error(`Cuentas aún sin mapear: ${[...stillUnmapped].join(", ")}`);
       }
 
-      // 5. Get version info (version_id, company_id, year) to build versionMap
+      // 5. Get version info to build versionMap
       const versionInfo = await tx<{ id: string; company_id: string; year: number }[]>`
         SELECT id, company_id, year
         FROM finanzas.budget_versions
@@ -132,28 +133,14 @@ export async function POST(request: NextRequest) {
       `;
       const versionMap = new Map(versionInfo.map((v) => [`${v.company_id}:${v.year}`, v.id]));
 
-      // 6. Aggregate staging → budget_monthly
-      const agg = new Map<string, { versionId: string; companyId: string; pnlLineId: string; periodMonth: string; amount: number }>();
-      for (const s of staging) {
-        const pnlLineId = resolve(s.account_name, s.company_id)!;
-        const year      = s.period_month.slice(0, 4);
-        const vid       = versionMap.get(`${s.company_id}:${Number(year)}`) ?? body.versionId;
-        const key       = `${vid}|${s.company_id}|${pnlLineId}|${s.period_month}`;
-        const existing  = agg.get(key);
-        if (existing) {
-          existing.amount += Number(s.amount);
-        } else {
-          agg.set(key, { versionId: vid, companyId: s.company_id, pnlLineId, periodMonth: s.period_month, amount: Number(s.amount) });
-        }
-      }
-
-      const values = Array.from(agg.values()).map((v) => ({
-        version_id:   v.versionId,
-        company_id:   v.companyId,
-        pnl_line_id:  v.pnlLineId,
-        period_month: v.periodMonth,
-        amount:       v.amount,
+      // 6. Aggregate staging → budget_monthly using shared helper
+      const stagingRows = staging.map((s) => ({
+        company_id:  s.company_id,
+        accountName: s.account_name,
+        periodMonth: s.period_month,
+        amount:      Number(s.amount),
       }));
+      const values = buildBudgetMonthlyValues(stagingRows, new Map(), versionMap, resolve);
 
       const BATCH = 500;
       for (let i = 0; i < values.length; i += BATCH) {
