@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { KpiMetric } from "@/lib/eerr";
+import type { ChartsData } from "@/components/dashboard/DashboardCharts";
+
+const DashboardCharts = dynamic(
+  () => import("@/components/dashboard/DashboardCharts").then((m) => ({ default: m.DashboardCharts })),
+  { ssr: false }
+);
 
 function defaultPeriod() {
   const now = new Date();
@@ -12,13 +19,16 @@ function defaultPeriod() {
 }
 
 export default function DashboardPage() {
-  const [period, setPeriod] = useState(defaultPeriod);
-  const [kpis,   setKpis]   = useState<KpiMetric[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]  = useState<string | null>(null);
+  const [period,       setPeriod]       = useState(defaultPeriod);
+  const [kpis,         setKpis]         = useState<KpiMetric[]>([]);
+  const [chartsData,   setChartsData]   = useState<ChartsData | null>(null);
+  const [kpisLoading,  setKpisLoading]  = useState(true);
+  const [chartsLoading, setChartsLoading] = useState(true);
+  const [error,        setError]        = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
+    setKpisLoading(true);
+    setError(null);
     fetch(`/api/dashboard?period=${period}`)
       .then((r) => {
         if (!r.ok) throw new Error(`Error ${r.status}`);
@@ -26,11 +36,21 @@ export default function DashboardPage() {
       })
       .then(setKpis)
       .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .finally(() => setKpisLoading(false));
+  }, [period]);
+
+  useEffect(() => {
+    setChartsLoading(true);
+    fetch(`/api/dashboard/charts?period=${period}`)
+      .then((r) => r.json() as Promise<ChartsData>)
+      .then(setChartsData)
+      .catch(() => {})
+      .finally(() => setChartsLoading(false));
   }, [period]);
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-head text-ev-black">Dashboard</h1>
@@ -54,7 +74,8 @@ export default function DashboardPage() {
         <div className="border border-ev-red/30 bg-ev-beige1 px-4 py-3 text-sm text-ev-darkred font-body">{error}</div>
       )}
 
-      {loading ? (
+      {/* KPI cards */}
+      {kpisLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="border border-ev-gray7 bg-white p-5 animate-pulse h-24" />
@@ -73,9 +94,18 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="border border-ev-gray7 bg-white p-5 text-sm text-ev-gray3 font-body">
-        <p>Haz click en <a href="/eerr" className="text-ev-black underline hover:text-ev-gray2">EERR YTD</a> para ver el Estado de Resultados completo.</p>
-      </div>
+      {/* Charts */}
+      {chartsLoading ? (
+        <div className="space-y-4">
+          <div className="border border-ev-gray7 bg-white h-72 animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="border border-ev-gray7 bg-white h-72 animate-pulse" />
+            <div className="border border-ev-gray7 bg-white h-72 animate-pulse" />
+          </div>
+        </div>
+      ) : chartsData ? (
+        <DashboardCharts {...chartsData} />
+      ) : null}
     </div>
   );
 }
