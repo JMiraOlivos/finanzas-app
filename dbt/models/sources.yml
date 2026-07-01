@@ -1,0 +1,131 @@
+version: 2
+
+sources:
+  - name: finanzas
+    schema: finanzas
+    description: "Portal financiero E&V — tablas operacionales en Neon Postgres (schema finanzas)"
+
+    tables:
+      - name: companies
+        description: "Empresas E&V registradas (9 activas)"
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: name
+            tests: [unique, not_null]
+          - name: is_active
+            tests: [not_null]
+
+      - name: uploaded_files
+        description: "Historial de cargas de libros diarios Excel por empresa y período"
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: company_id
+            tests: [not_null]
+          - name: status
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['uploaded', 'processing', 'processed', 'failed', 'replaced']
+
+      - name: journal_entries
+        description: "Movimientos contables del libro diario. amount = credit - debit (ingresos > 0, gastos < 0)"
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: company_id
+            tests: [not_null]
+          - name: period_month
+            tests: [not_null]
+          - name: account_code
+            tests: [not_null]
+
+      - name: pnl_lines
+        description: "Jerarquía del Estado de Resultados (~70 líneas con sort_order y formula_key)"
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: code
+            tests: [unique, not_null]
+          - name: line_type
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['detail', 'subtotal', 'calculated']
+
+      - name: account_pnl_mappings
+        description: "Mapeo cuenta contable → línea PnL. company_id NULL aplica a todas las empresas (global)"
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: account_code
+            tests: [not_null]
+          - name: pnl_line_id
+            tests: [not_null]
+          - name: sign_multiplier
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [1, -1]
+
+      - name: budget_versions
+        description: "Versiones de presupuesto por empresa y año"
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: company_id
+            tests: [not_null]
+          - name: year
+            tests: [not_null]
+
+      - name: budget_monthly
+        description: "Montos mensuales de presupuesto por versión, empresa y línea PnL"
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: version_id
+            tests: [not_null]
+          - name: company_id
+            tests: [not_null]
+          - name: period_month
+            tests: [not_null]
+
+      - name: forecast_versions
+        description: "Versiones de forecast por empresa y año"
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: company_id
+            tests: [not_null]
+          - name: year
+            tests: [not_null]
+
+      - name: forecast_monthly
+        description: "Montos mensuales de forecast por versión, empresa y línea PnL"
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: version_id
+            tests: [not_null]
+          - name: company_id
+            tests: [not_null]
+          - name: period_month
+            tests: [not_null]
+
+      - name: pnl_formula_components
+        description: "Config de fórmulas calculadas: EBITDA, RESULTADO_ANTES_IMP, RESULTADO_FINAL"
+        columns:
+          - name: formula_key
+            tests: [not_null]
+          - name: component_line_code
+            tests: [not_null]
+          - name: operator
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['+', '-']

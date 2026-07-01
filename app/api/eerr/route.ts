@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { getAllowedCompanyIds } from "@/lib/permissions";
+import { getAllowedCompanyIds, assertCanExport } from "@/lib/permissions";
 import { FinancialColumnGroup, FinancialRow, FinancialStatementPayload } from "@/lib/eerr";
 import { buildEerrWorkbook } from "@/lib/export-excel";
 import { formatPeriodMonth } from "@/lib/formatters";
@@ -34,6 +34,17 @@ export async function GET(request: NextRequest) {
   if (companyIds !== null && companyIds.length === 0) {
     const empty: FinancialStatementPayload = { title: "EERR", periodLabel: "", columnGroups: [], rows: [] };
     return NextResponse.json(empty);
+  }
+
+  // Validate per-company export permission before generating any file
+  if (format === "excel" && companyIds !== null) {
+    for (const cid of companyIds) {
+      try {
+        await assertCanExport(user.id, user.role, cid);
+      } catch {
+        return NextResponse.json({ error: "Forbidden: export not allowed for one or more selected companies" }, { status: 403 });
+      }
+    }
   }
 
   if (mode === "vs_budget") {

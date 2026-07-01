@@ -1,0 +1,23 @@
+# Copiar a ~/.dbt/profiles.yml y completar con credenciales reales.
+# NO commitear con credenciales — este archivo es solo el ejemplo.
+#
+# Neon connection string de referencia:
+#   postgresql://<user>:<password>@ep-falling-dream-ataeez3h-pooler.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require
+#
+# Para encontrar user y password: Neon Dashboard → Connection Details → show password
+
+finanzas:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: ep-falling-dream-ataeez3h-pooler.c-9.us-east-1.aws.neon.tech
+      port: 5432
+      user: "{{ env_var('NEON_USER') }}"
+      password: "{{ env_var('NEON_PASSWORD') }}"
+      dbname: neondb
+      schema: finanzas
+      sslmode: require
+      connect_timeout: 10
+      keepalives_idle: 0
+      threads: 4

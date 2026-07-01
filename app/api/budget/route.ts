@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, getAllowedCompanyIds } from "@/lib/permissions";
 import { loadBudgetFile } from "@/lib/ingest/loadBudget";
 import { sql } from "@/lib/db";
+import { triggerDbtRun } from "@/lib/dbt";
 
 export const runtime   = "nodejs";
 export const maxDuration = 60;
@@ -35,6 +36,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: 422 });
   }
 
+  void triggerDbtRun();
   return NextResponse.json(result);
 }
 
@@ -43,26 +45,48 @@ export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const user = session.user as { id: string; role: string };
+
   const { searchParams } = new URL(request.url);
   const period = searchParams.get("period");
   if (!period) return NextResponse.json({ error: "Missing period" }, { status: 400 });
 
-  const rows = await sql`
-    SELECT
-      bv.company_id,
-      c.name  AS company_name,
-      pl.code AS pnl_line_code,
-      pl.label AS pnl_line_label,
-      bm.period_month,
-      bm.amount
-    FROM finanzas.budget_monthly bm
-    JOIN finanzas.budget_versions bv ON bm.version_id = bv.id AND bv.is_active = TRUE
-    JOIN finanzas.companies  c  ON c.id  = bm.company_id
-    JOIN finanzas.pnl_lines  pl ON pl.id = bm.pnl_line_id
-    WHERE bm.period_month >= date_trunc('year', ${period}::date)::date
-      AND bm.period_month <= ${period}::date
-    ORDER BY c.name, pl.sort_order, bm.period_month
-  `;
+  const allowedIds = await getAllowedCompanyIds(user.id, user.role);
+
+  const rows = allowedIds === null
+    ? await sql`
+        SELECT
+          bv.company_id,
+          c.name  AS company_name,
+          pl.code AS pnl_line_code,
+          pl.label AS pnl_line_label,
+          bm.period_month,
+          bm.amount
+        FROM finanzas.budget_monthly bm
+        JOIN finanzas.budget_versions bv ON bm.version_id = bv.id AND bv.is_active = TRUE
+        JOIN finanzas.companies  c  ON c.id  = bm.company_id
+        JOIN finanzas.pnl_lines  pl ON pl.id = bm.pnl_line_id
+        WHERE bm.period_month >= date_trunc('year', ${period}::date)::date
+          AND bm.period_month <= ${period}::date
+        ORDER BY c.name, pl.sort_order, bm.period_month
+      `
+    : await sql`
+        SELECT
+          bv.company_id,
+          c.name  AS company_name,
+          pl.code AS pnl_line_code,
+          pl.label AS pnl_line_label,
+          bm.period_month,
+          bm.amount
+        FROM finanzas.budget_monthly bm
+        JOIN finanzas.budget_versions bv ON bm.version_id = bv.id AND bv.is_active = TRUE
+        JOIN finanzas.companies  c  ON c.id  = bm.company_id
+        JOIN finanzas.pnl_lines  pl ON pl.id = bm.pnl_line_id
+        WHERE bm.period_month >= date_trunc('year', ${period}::date)::date
+          AND bm.period_month <= ${period}::date
+          AND bm.company_id = ANY(${allowedIds}::uuid[])
+        ORDER BY c.name, pl.sort_order, bm.period_month
+      `;
 
   return NextResponse.json(rows);
 }

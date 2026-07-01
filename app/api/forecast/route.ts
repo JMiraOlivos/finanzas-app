@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { loadForecastFile } from "@/lib/ingest/loadForecast";
+import { triggerDbtRun } from "@/lib/dbt";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -19,5 +20,6 @@ export async function POST(request: NextRequest) {
   const result = await loadForecastFile({ buffer, filename: file.name, uploadedBy: user.id });
 
   if (!result.success) return NextResponse.json({ error: result.error }, { status: 422 });
+  void triggerDbtRun();
   return NextResponse.json(result);
 }

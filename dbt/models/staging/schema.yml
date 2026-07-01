@@ -1,0 +1,75 @@
+version: 2
+
+models:
+  - name: stg_companies
+    description: "Empresas E&V activas e inactivas"
+    columns:
+      - name: id
+        tests: [unique, not_null]
+      - name: name
+        tests: [unique, not_null]
+
+  - name: stg_uploaded_files
+    description: "Historial de cargas. superseded_by indica qué carga reemplazó a esta"
+    columns:
+      - name: id
+        tests: [unique, not_null]
+      - name: company_id
+        tests: [not_null]
+      - name: status
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['uploaded', 'processing', 'processed', 'failed', 'replaced']
+
+  - name: stg_journal_entries
+    description: "Movimientos contables — todos los períodos y estados"
+    columns:
+      - name: id
+        tests: [unique, not_null]
+      - name: company_id
+        tests: [not_null]
+      - name: period_month
+        tests: [not_null]
+
+  - name: stg_pnl_lines
+    description: "Jerarquía completa del Estado de Resultados"
+    columns:
+      - name: id
+        tests: [unique, not_null]
+      - name: code
+        tests: [unique, not_null]
+
+  - name: stg_account_pnl_mappings
+    description: "Mapeo cuenta → línea PnL. company_id NULL = mapeo global"
+    columns:
+      - name: id
+        tests: [unique, not_null]
+
+  - name: stg_budget_monthly
+    description: "Montos de presupuesto con metadata de versión (year, is_active)"
+    columns:
+      - name: id
+        tests: [unique, not_null]
+      - name: company_id
+        tests: [not_null]
+      - name: period_month
+        tests: [not_null]
+
+  - name: stg_forecast_monthly
+    description: "Montos de forecast con metadata de versión (year, is_active)"
+    columns:
+      - name: id
+        tests: [unique, not_null]
+      - name: company_id
+        tests: [not_null]
+      - name: period_month
+        tests: [not_null]
+
+  - name: stg_pnl_formula_components
+    description: "Componentes de fórmulas: qué líneas suma cada cálculo (EBITDA, RESULTADO_FINAL, etc.)"
+    columns:
+      - name: formula_key
+        tests: [not_null]
+      - name: component_line_code
+        tests: [not_null]

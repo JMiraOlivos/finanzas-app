@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { loadJournalFile } from "@/lib/ingest/loadJournal";
+import { triggerDbtRun } from "@/lib/dbt";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -38,5 +39,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: 422 });
   }
 
+  void triggerDbtRun();
   return NextResponse.json(result);
 }

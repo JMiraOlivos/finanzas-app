@@ -1,0 +1,53 @@
+version: 2
+
+models:
+  - name: fct_pnl_monthly
+    description: >
+      Montos P&L mensuales por empresa y línea de detalle.
+      Equivalente a v_pnl_base_monthly pero filtrado a cargas procesadas.
+      Subtotales y líneas calculadas (EBITDA, Resultado) se derivan en query time.
+    columns:
+      - name: company_id
+        tests: [not_null]
+      - name: pnl_line_code
+        tests: [not_null]
+      - name: period_month
+        tests: [not_null]
+      - name: amount
+        description: "Suma de mapped_amount para la línea de detalle. Ingresos > 0, gastos < 0."
+
+  - name: fct_scenario_monthly
+    description: >
+      Real, presupuesto y forecast por (empresa, período, línea PnL) con metadata de línea.
+      Base para vistas de varianza en dashboard y EERR vs presupuesto.
+    columns:
+      - name: company_id
+        tests: [not_null]
+      - name: pnl_line_code
+        tests: [not_null]
+      - name: period_month
+        tests: [not_null]
+      - name: scenario
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['actual', 'budget', 'forecast']
+
+  - name: dq_financial_control
+    description: >
+      Control de calidad por carga procesada: semáforo green/yellow/red,
+      desbalance debe/haber, cuentas sin mapear y cargas atascadas.
+    columns:
+      - name: file_id
+        tests: [unique, not_null]
+      - name: company_id
+        tests: [not_null]
+      - name: period_month
+        tests: [not_null]
+      - name: status
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['green', 'yellow', 'red']

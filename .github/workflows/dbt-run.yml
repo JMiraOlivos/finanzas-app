@@ -1,0 +1,57 @@
+name: dbt — run + test
+
+on:
+  repository_dispatch:
+    types: [dbt-run]
+  workflow_dispatch:
+
+jobs:
+  dbt-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: dbt/requirements.txt
+
+      - name: Install dbt
+        run: pip install -r requirements.txt
+        working-directory: dbt
+
+      - name: Write dbt profiles
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << 'EOF'
+          finanzas:
+            target: prod
+            outputs:
+              prod:
+                type: postgres
+                host: ep-falling-dream-ataeez3h-pooler.c-9.us-east-1.aws.neon.tech
+                port: 5432
+                user: "{{ env_var('NEON_USER') }}"
+                password: "{{ env_var('NEON_PASSWORD') }}"
+                dbname: neondb
+                schema: finanzas
+                sslmode: require
+                threads: 4
+          EOF
+
+      - name: dbt run (refresh mart tables)
+        env:
+          NEON_USER: ${{ secrets.NEON_USER }}
+          NEON_PASSWORD: ${{ secrets.NEON_PASSWORD }}
+        run: dbt run --select tag:mart
+        working-directory: dbt
+
+      - name: dbt test
+        env:
+          NEON_USER: ${{ secrets.NEON_USER }}
+          NEON_PASSWORD: ${{ secrets.NEON_PASSWORD }}
+        run: dbt test
+        working-directory: dbt

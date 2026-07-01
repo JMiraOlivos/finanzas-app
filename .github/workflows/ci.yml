@@ -6,12 +6,8 @@ on:
   pull_request:
 
 jobs:
-  check:
+  build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: finanzas-app
-
     steps:
       - uses: actions/checkout@v4
 
@@ -19,20 +15,53 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: finanzas-app/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - run: npm run lint
 
-      - name: Type check
-        run: npx tsc --noEmit
+      - run: npx tsc --noEmit
 
-      - name: Build
-        run: npm run build
+      - run: npm run build
         env:
-          DATABASE_URL: postgresql://ci:ci@localhost/ci
-          NEXTAUTH_SECRET: ci-secret-for-build-only
-          NEXTAUTH_URL: http://localhost:3000
+          DATABASE_URL: postgresql://dummy:dummy@localhost/dummy?sslmode=disable
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          AUTH_URL: ${{ secrets.AUTH_URL }}
+
+  dbt-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: dbt/requirements.txt
+
+      - name: Install dbt
+        run: pip install -r requirements.txt
+        working-directory: dbt
+
+      - name: Write dummy profiles for dbt parse
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << 'EOF'
+          finanzas:
+            target: ci
+            outputs:
+              ci:
+                type: postgres
+                host: localhost
+                port: 5432
+                user: ci
+                password: ci
+                dbname: ci
+                schema: finanzas
+                threads: 1
+          EOF
+
+      - name: dbt parse (validates models without DB connection)
+        run: dbt parse
+        working-directory: dbt

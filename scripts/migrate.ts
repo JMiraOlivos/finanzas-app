@@ -46,6 +46,7 @@ const MIGRATION_FILES = [
   "007_upload_versioning.sql",
   "008_budget_forecast.sql",
   "009_formula_components.sql",
+  "010_constraints.sql",
 ];
 
 async function run() {

@@ -1,0 +1,58 @@
+version: 2
+
+models:
+  - name: int_active_uploads
+    description: "Cargas con status='processed'. Base para filtrar journal_entries vigentes."
+    columns:
+      - name: id
+        tests: [unique, not_null]
+      - name: company_id
+        tests: [not_null]
+      - name: period_month
+        tests: [not_null]
+
+  - name: int_active_journal_entries
+    description: "Journal entries de cargas procesadas + legacy migradas (uploaded_file_id IS NULL)."
+    columns:
+      - name: id
+        tests: [unique, not_null]
+      - name: company_id
+        tests: [not_null]
+      - name: period_month
+        tests: [not_null]
+
+  - name: int_account_mapping_resolved
+    description: "Mapping resuelto por (company, account_code). Empresa-específico gana sobre global."
+    columns:
+      - name: company_id
+        tests: [not_null]
+      - name: account_code
+        tests: [not_null]
+      - name: pnl_line_id
+        tests: [not_null]
+
+  - name: int_pnl_movements_mapped
+    description: "Movimientos P&L activos cruzados con su línea PnL resuelta. Excluye no-mapeados."
+    columns:
+      - name: journal_entry_id
+        tests: [unique, not_null]
+      - name: company_id
+        tests: [not_null]
+      - name: pnl_line_id
+        tests: [not_null]
+
+  - name: int_scenario_monthly
+    description: "Real + presupuesto + forecast unificados por (empresa, período, línea PnL)."
+    columns:
+      - name: company_id
+        tests: [not_null]
+      - name: period_month
+        tests: [not_null]
+      - name: pnl_line_id
+        tests: [not_null]
+      - name: scenario
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['actual', 'budget', 'forecast']
