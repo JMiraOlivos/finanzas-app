@@ -130,10 +130,12 @@ export function parseJournalBuffer(buffer: Buffer, filename: string): ParsedRow[
       throw new Error(`No se pueden detectar columnas en ${filename}. Formato desconocido.`);
     }
 
-    // Format A (10 cols, no headers): fecha | tipo | ndoc | linea | glosa | cuenta_cod | cuenta_nom | debe | haber | saldo
-    // Detected when col 5 looks like a numeric account code.
+    // Format A (10 cols, no headers):
+    //   [0]=fecha [1]=tipo [2]=ndoc [3]=linea [4]=glosa
+    //   [5]=cuenta_cod [6]=cuenta_nom [7]=otro [8]=debe [9]=haber
+    // Detected when col 5 looks like a numeric account code and file has ≥10 cols.
     const col5 = r0[5] !== null && r0[5] !== undefined ? String(r0[5]).trim() : "";
-    const isFormatA = r0.length >= 9 && /^\d{4,}$/.test(col5.replace(/\./g, ""));
+    const isFormatA = r0.length >= 10 && /^\d{4,}$/.test(col5.replace(/\./g, ""));
 
     if (isFormatA) {
       dataRows = raw;
@@ -143,8 +145,8 @@ export function parseJournalBuffer(buffer: Buffer, filename: string): ParsedRow[
         accountName:    6,
         description:    4,
         documentNumber: 2,
-        debit:          7,
-        credit:         8,
+        debit:          8,   // col 8 = debe
+        credit:         9,   // col 9 = haber  (col 7 is an unrelated field)
         amount:         null,
       };
     } else {
