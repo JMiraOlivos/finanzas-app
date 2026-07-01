@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { ScenarioKpiCard } from "@/components/dashboard/ScenarioKpiCard";
 import { AlertsPanel, type Alert } from "@/components/dashboard/AlertsPanel";
+import { ClosureStatusPanel, type ControlRow } from "@/components/dashboard/ClosureStatusPanel";
 import { CompanyRanking, type CompanyRankingRow } from "@/components/dashboard/CompanyRanking";
 import type { ChartsData } from "@/components/dashboard/DashboardCharts";
 
@@ -41,13 +42,15 @@ export default function DashboardPage() {
   const [period,         setPeriod]         = useState(defaultPeriod);
   const [kpis,           setKpis]           = useState<KpiMetric[]>([]);
   const [chartsData,     setChartsData]     = useState<ChartsData | null>(null);
-  const [ranking,        setRanking]        = useState<CompanyRankingRow[]>([]);
-  const [alerts,         setAlerts]         = useState<Alert[]>([]);
-  const [kpisLoading,    setKpisLoading]    = useState(true);
-  const [chartsLoading,  setChartsLoading]  = useState(true);
-  const [rankingLoading, setRankingLoading] = useState(true);
-  const [alertsLoading,  setAlertsLoading]  = useState(true);
-  const [error,          setError]          = useState<string | null>(null);
+  const [ranking,         setRanking]         = useState<CompanyRankingRow[]>([]);
+  const [alerts,          setAlerts]          = useState<Alert[]>([]);
+  const [control,         setControl]         = useState<ControlRow[]>([]);
+  const [kpisLoading,     setKpisLoading]     = useState(true);
+  const [chartsLoading,   setChartsLoading]   = useState(true);
+  const [rankingLoading,  setRankingLoading]  = useState(true);
+  const [alertsLoading,   setAlertsLoading]   = useState(true);
+  const [controlLoading,  setControlLoading]  = useState(true);
+  const [error,           setError]           = useState<string | null>(null);
 
   const fetchKpis = useCallback(() => {
     setKpisLoading(true);
@@ -86,10 +89,20 @@ export default function DashboardPage() {
       .finally(() => setAlertsLoading(false));
   }, [period]);
 
+  const fetchControl = useCallback(() => {
+    setControlLoading(true);
+    fetch(`/api/dashboard/control?period=${period}`)
+      .then((r) => r.json() as Promise<ControlRow[]>)
+      .then(setControl)
+      .catch(() => {})
+      .finally(() => setControlLoading(false));
+  }, [period]);
+
   useEffect(() => { fetchKpis(); }, [fetchKpis]);
   useEffect(() => { fetchCharts(); }, [fetchCharts]);
   useEffect(() => { fetchRanking(); }, [fetchRanking]);
   useEffect(() => { fetchAlerts(); }, [fetchAlerts]);
+  useEffect(() => { fetchControl(); }, [fetchControl]);
 
   const kpiMap = Object.fromEntries(kpis.map((k) => [k.code, k]));
 
@@ -179,46 +192,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <AlertsPanel alerts={alerts} loading={alertsLoading} />
 
-        {/* Data Quality summary card */}
-        <div className="border border-ev-gray7 bg-white p-5 space-y-3">
-          <p className="text-[10px] font-body uppercase tracking-[0.1em] text-ev-gray3">Calidad de datos</p>
-          {kpisLoading ? (
-            <div className="space-y-2">
-              {[1,2,3].map((i) => <div key={i} className="h-6 bg-neutral-100 animate-pulse rounded" />)}
-            </div>
-          ) : (
-            <div className="space-y-2 pt-1">
-              {(() => {
-                const attain = kpiMap["EBITDA_BUDGET_ATTAIN"]?.value;
-                const budgetEbitda = kpiMap["EBITDA_VS_BUDGET_PCT"]?.value;
-                return (
-                  <>
-                    <div className="flex justify-between text-sm font-body">
-                      <span className="text-ev-gray3">Cumplimiento ppto. EBITDA</span>
-                      <span className={["font-medium tabular-nums", attain != null && attain < 0.9 ? "text-ev-red" : "text-ev-black"].join(" ")}>
-                        {attain != null ? `${Math.round(attain * 100)}%` : "—"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm font-body">
-                      <span className="text-ev-gray3">EBITDA vs ppto.</span>
-                      <span className={["font-medium tabular-nums", budgetEbitda != null && budgetEbitda < 0 ? "text-ev-red" : "text-ev-black"].join(" ")}>
-                        {budgetEbitda != null ? `${budgetEbitda >= 0 ? "+" : ""}${Math.round(budgetEbitda * 100)}%` : "—"}
-                      </span>
-                    </div>
-                    <div className="pt-2 border-t border-ev-gray7">
-                      <a
-                        href="/admin/control"
-                        className="text-xs font-body text-ev-gray3 underline underline-offset-2 hover:text-ev-black"
-                      >
-                        Ver centro de control →
-                      </a>
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-          )}
-        </div>
+        <ClosureStatusPanel rows={control} loading={controlLoading} />
       </div>
 
       {/* ── Bloque 3: Ranking empresas ── */}
