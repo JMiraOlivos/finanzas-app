@@ -15,7 +15,26 @@ const config: Config = {
       screens: { "2xl": "1400px" },
     },
     extend: {
+      fontFamily: {
+        head: ['"EngelVoelkersHead"', 'Georgia', 'serif'],
+        body: ['"EngelVoelkersText"', 'Arial', 'sans-serif'],
+      },
       colors: {
+        ev: {
+          white:   '#FFFFFF',
+          black:   '#303030',
+          red:     '#E60000',
+          darkred: '#910F05',
+          gray1:   '#282626',
+          gray2:   '#404040',
+          gray3:   '#666666',
+          gray4:   '#808080',
+          gray5:   '#999999',
+          gray6:   '#B3B3B3',
+          gray7:   '#CCCCCC',
+          beige1:  '#E2D9D0',
+          beige2:  '#F8F5F0',
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

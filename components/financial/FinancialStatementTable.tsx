@@ -51,7 +51,7 @@ export function FinancialStatementTable({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-sm text-neutral-400">
+      <div className="flex items-center justify-center h-64 text-sm text-ev-gray4">
         Cargando datos…
       </div>
     );
@@ -59,18 +59,18 @@ export function FinancialStatementTable({
 
   if (!rows.length) {
     return (
-      <div className="flex items-center justify-center h-40 text-sm text-neutral-400">
+      <div className="flex items-center justify-center h-40 text-sm text-ev-gray4">
         No hay datos para el período seleccionado.
       </div>
     );
   }
 
   return (
-    <section className="rounded-xl border bg-white shadow-sm overflow-hidden">
+    <section className="border border-ev-gray7 bg-white overflow-hidden">
       {(title || periodLabel) && (
-        <div className="border-b px-4 py-3 flex items-baseline gap-3">
-          {title && <h2 className="text-base font-semibold text-neutral-900">{title}</h2>}
-          {periodLabel && <span className="text-sm text-neutral-500">{periodLabel}</span>}
+        <div className="border-b border-ev-gray7 px-4 py-3 flex items-baseline gap-3">
+          {title && <h2 className="text-sm font-head text-ev-black">{title}</h2>}
+          {periodLabel && <span className="text-xs font-body text-ev-gray3 uppercase tracking-[0.08em]">{periodLabel}</span>}
         </div>
       )}
 
@@ -78,10 +78,10 @@ export function FinancialStatementTable({
         <table className="min-w-full border-collapse text-xs financial-table">
           <thead className="sticky top-0 z-20">
             {/* Row 1: company groups */}
-            <tr className="bg-neutral-50 border-b">
+            <tr className="bg-ev-beige2 border-b border-ev-gray7">
               <th
                 rowSpan={2}
-                className="sticky left-0 z-30 min-w-[260px] max-w-[320px] border-b border-r bg-neutral-50 px-3 py-2 text-left font-semibold text-neutral-700"
+                className="sticky left-0 z-30 min-w-[260px] max-w-[320px] border-b border-r border-ev-gray7 bg-ev-beige2 px-3 py-2 text-left font-body font-semibold text-ev-gray2"
               >
                 Sección PnL
               </th>
@@ -89,7 +89,7 @@ export function FinancialStatementTable({
                 <th
                   key={group.id}
                   colSpan={group.columns.length}
-                  className="border-b border-r px-3 py-2 text-center font-semibold text-neutral-700 whitespace-nowrap"
+                  className="border-b border-r border-ev-gray7 px-3 py-2 text-center font-body font-semibold text-ev-gray2 whitespace-nowrap"
                 >
                   {group.label}
                 </th>
@@ -97,11 +97,11 @@ export function FinancialStatementTable({
             </tr>
 
             {/* Row 2: column labels */}
-            <tr className="bg-neutral-50 border-b">
+            <tr className="bg-ev-beige2 border-b border-ev-gray7">
               {flatColumns.map((col) => (
                 <th
                   key={col.id}
-                  className="min-w-[110px] border-b border-r px-3 py-1.5 text-right font-medium text-neutral-500 whitespace-nowrap"
+                  className="min-w-[110px] border-b border-r border-ev-gray7 px-3 py-1.5 text-right font-body font-medium text-ev-gray3 whitespace-nowrap"
                 >
                   {col.label}
                 </th>
@@ -118,16 +118,16 @@ export function FinancialStatementTable({
                 <tr
                   key={row.code}
                   className={[
-                    "border-b",
-                    row.isHighlighted ? "bg-neutral-100" : "hover:bg-neutral-50",
-                    row.lineType === "calculated" ? "border-t-2 border-t-neutral-700" : "",
+                    "border-b border-ev-gray7",
+                    row.isHighlighted ? "bg-ev-beige1" : "hover:bg-ev-beige2",
+                    row.lineType === "calculated" ? "border-t-2 border-t-ev-black" : "",
                   ].join(" ")}
                 >
                   {/* Label cell (sticky) */}
                   <td
                     className={[
-                      "sticky left-0 z-10 border-r px-3 py-1.5 text-left bg-white",
-                      row.isHighlighted ? "bg-neutral-100" : "",
+                      "sticky left-0 z-10 border-r border-ev-gray7 px-3 py-1.5 text-left bg-white",
+                      row.isHighlighted ? "bg-ev-beige1" : "",
                       row.isBold ? "font-semibold" : "",
                     ].join(" ")}
                     style={{ paddingLeft: `${12 + row.level * 18}px` }}
@@ -136,7 +136,7 @@ export function FinancialStatementTable({
                       {isCollapsible && (
                         <button
                           onClick={() => toggle(row.code)}
-                          className="text-neutral-400 hover:text-neutral-700 w-3 shrink-0"
+                          className="text-ev-gray4 hover:text-ev-black w-3 shrink-0"
                           aria-label={isCollapsed ? "Expandir" : "Colapsar"}
                         >
                           {isCollapsed ? "▶" : "▼"}
@@ -156,9 +156,9 @@ export function FinancialStatementTable({
                       <td
                         key={`${row.code}|${col.id}`}
                         className={[
-                          "border-r px-3 py-1.5 text-right tabular-nums whitespace-nowrap",
+                          "border-r border-ev-gray7 px-3 py-1.5 text-right tabular-nums whitespace-nowrap",
                           row.isBold ? "font-semibold" : "",
-                          isNegative ? "text-red-600" : "",
+                          isNegative ? "text-ev-red" : "",
                           clickable ? "cursor-pointer hover:bg-yellow-50" : "",
                         ].join(" ")}
                         onClick={() => {
@@ -167,7 +167,7 @@ export function FinancialStatementTable({
                         }}
                       >
                         {value !== null ? formatFinancialValue(value, col.type) : (
-                          <span className="text-neutral-300">—</span>
+                          <span className="text-ev-gray7">—</span>
                         )}
                       </td>
                     );

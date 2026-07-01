@@ -17,13 +17,13 @@ export function KpiCard({ label, value, format, description }: Props) {
   const isNegative = typeof value === "number" && value < 0;
 
   return (
-    <div className="rounded-xl border bg-white p-4 shadow-sm">
-      <p className="text-xs font-medium text-neutral-500 mb-1">{label}</p>
-      <p className={["text-2xl font-semibold tabular-nums", isNegative ? "text-red-600" : "text-neutral-900"].join(" ")}>
+    <div className="border border-ev-gray7 bg-white p-5">
+      <p className="text-[10px] font-body uppercase tracking-[0.1em] text-ev-gray3 mb-2">{label}</p>
+      <p className={["text-2xl font-head tabular-nums", isNegative ? "text-ev-red" : "text-ev-black"].join(" ")}>
         {formatted}
       </p>
       {description && (
-        <p className="text-xs text-neutral-400 mt-1">{description}</p>
+        <p className="text-xs text-ev-gray4 mt-1 font-body">{description}</p>
       )}
     </div>
   );

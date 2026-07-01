@@ -50,30 +50,30 @@ export function EerrFilters({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 py-3 px-4 border-b bg-neutral-50">
+    <div className="flex flex-wrap items-center gap-3 py-3 px-4 border-b border-ev-gray7 bg-ev-beige2">
       {/* Period picker */}
       <div className="flex items-center gap-2">
-        <label className="text-xs font-medium text-neutral-600">Período</label>
+        <label className="text-xs font-body font-medium text-ev-gray2">Período</label>
         <input
           type="month"
           value={monthValue}
           onChange={handleMonthChange}
-          className="text-xs border rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
+          className="text-xs border border-ev-gray6 px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-ev-black"
         />
       </div>
 
       {/* Mode toggle */}
       {onModeChange && (
-        <div className="flex rounded border overflow-hidden text-xs">
+        <div className="flex border border-ev-gray6 overflow-hidden text-xs">
           <button
             onClick={() => onModeChange("ytd")}
-            className={["px-3 py-1 font-medium", mode === "ytd" ? "bg-neutral-900 text-white" : "bg-white text-neutral-600 hover:bg-neutral-100"].join(" ")}
+            className={["px-3 py-1 font-body font-medium", mode === "ytd" ? "bg-ev-black text-white" : "bg-white text-ev-gray2 hover:bg-ev-beige2"].join(" ")}
           >
             YTD
           </button>
           <button
             onClick={() => onModeChange("lmonth")}
-            className={["px-3 py-1 font-medium border-l", mode === "lmonth" ? "bg-neutral-900 text-white" : "bg-white text-neutral-600 hover:bg-neutral-100"].join(" ")}
+            className={["px-3 py-1 font-body font-medium border-l border-ev-gray6", mode === "lmonth" ? "bg-ev-black text-white" : "bg-white text-ev-gray2 hover:bg-ev-beige2"].join(" ")}
           >
             Mes + YTD
           </button>
@@ -82,18 +82,18 @@ export function EerrFilters({
 
       {/* Company selector */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-medium text-neutral-600">Empresas</span>
-        <button onClick={selectAll} className="text-xs text-blue-600 hover:underline">Todas</button>
-        <button onClick={clearAll}  className="text-xs text-neutral-400 hover:underline">Ninguna</button>
+        <span className="text-xs font-body font-medium text-ev-gray2">Empresas</span>
+        <button onClick={selectAll} className="text-xs text-ev-black hover:underline font-body">Todas</button>
+        <button onClick={clearAll}  className="text-xs text-ev-gray4 hover:underline font-body">Ninguna</button>
         {companies.map((c) => (
           <button
             key={c.id}
             onClick={() => toggleCompany(c.id)}
             className={[
-              "text-xs px-2 py-0.5 rounded border",
+              "text-xs px-2 py-0.5 border font-body",
               selectedCompanyIds.includes(c.id)
-                ? "bg-neutral-900 text-white border-neutral-900"
-                : "bg-white text-neutral-600 border-neutral-300 hover:bg-neutral-50",
+                ? "bg-ev-black text-white border-ev-black"
+                : "bg-white text-ev-gray2 border-ev-gray6 hover:bg-ev-beige2",
             ].join(" ")}
           >
             {c.name.replace("E&V ", "")}
