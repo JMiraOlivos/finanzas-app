@@ -14,61 +14,45 @@ export async function GET(request: NextRequest) {
 
   const allowedIds = await getAllowedCompanyIds(user.id, user.role);
 
-  // Current year YTD
-  const currRows = allowedIds === null
-    ? await sql`SELECT * FROM finanzas.fn_pnl_ytd(${period}::date, NULL)`
-    : await sql`SELECT * FROM finanzas.fn_pnl_ytd(${period}::date, ${allowedIds}::uuid[])`;
+  const rows = allowedIds === null
+    ? await sql`
+        SELECT company_id, company_name,
+               revenue_ytd, ebitda_ytd, resultado_ytd,
+               revenue_ytd_prior, ebitda_ytd_prior
+        FROM finanzas.fct_dashboard_kpis
+        WHERE period_month = date_trunc('month', ${period}::date)::date
+        ORDER BY revenue_ytd DESC NULLS LAST
+      `
+    : await sql`
+        SELECT company_id, company_name,
+               revenue_ytd, ebitda_ytd, resultado_ytd,
+               revenue_ytd_prior, ebitda_ytd_prior
+        FROM finanzas.fct_dashboard_kpis
+        WHERE period_month = date_trunc('month', ${period}::date)::date
+          AND company_id = ANY(${allowedIds}::uuid[])
+        ORDER BY revenue_ytd DESC NULLS LAST
+      `;
 
-  // Prior year same period
-  const priorPeriod = `${Number(period.slice(0, 4)) - 1}${period.slice(4)}`;
-  const priorRows = allowedIds === null
-    ? await sql`SELECT * FROM finanzas.fn_pnl_ytd(${priorPeriod}::date, NULL)`
-    : await sql`SELECT * FROM finanzas.fn_pnl_ytd(${priorPeriod}::date, ${allowedIds}::uuid[])`;
+  const n = (v: unknown) => (v !== null && v !== undefined ? Number(v) : null);
+  const pct = (a: number | null, b: number | null) =>
+    a !== null && b ? (a - b) / Math.abs(b) : null;
 
-  type PnlRow = { company_id: string; company_name: string; line_code: string; amount: string | null };
-
-  function pivot(rows: PnlRow[]) {
-    const map = new Map<string, { companyId: string; companyName: string; revenue: number | null; ebitda: number | null; resultado: number | null }>();
-    for (const r of rows) {
-      if (!map.has(r.company_id)) {
-        map.set(r.company_id, { companyId: r.company_id, companyName: r.company_name, revenue: null, ebitda: null, resultado: null });
-      }
-      const entry = map.get(r.company_id)!;
-      const v = r.amount !== null ? Number(r.amount) : null;
-      if (r.line_code === "INGRESOS")        entry.revenue   = v;
-      if (r.line_code === "EBITDA")          entry.ebitda    = v;
-      if (r.line_code === "RESULTADO_FINAL") entry.resultado = v;
-    }
-    return map;
-  }
-
-  const curr  = pivot(currRows  as unknown as PnlRow[]);
-  const prior = pivot(priorRows as unknown as PnlRow[]);
-
-  const result = Array.from(curr.values()).map((c) => {
-    const p            = prior.get(c.companyId);
-    const ebitdaMargin = c.revenue && c.revenue !== 0 && c.ebitda != null ? c.ebitda / c.revenue : null;
-    const revPrior     = p?.revenue ?? null;
-    const revenueVsPriorPct = revPrior && revPrior !== 0 && c.revenue != null
-      ? (c.revenue - revPrior) / Math.abs(revPrior)
-      : null;
-    const ebitPrior    = p?.ebitda ?? null;
-    const ebitdaVsPriorPct = ebitPrior && ebitPrior !== 0 && c.ebitda != null
-      ? (c.ebitda - ebitPrior) / Math.abs(ebitPrior)
-      : null;
-    return {
-      companyId:          c.companyId,
-      companyName:        c.companyName,
-      revenue:            c.revenue,
-      ebitda:             c.ebitda,
-      ebitdaMargin,
-      resultado:          c.resultado,
-      revenueVsPriorPct,
-      ebitdaVsPriorPct,
-    };
-  });
-
-  result.sort((a, b) => (b.revenue ?? -Infinity) - (a.revenue ?? -Infinity));
-
-  return NextResponse.json(result);
+  return NextResponse.json(
+    rows.map((r) => {
+      const revenue  = n(r.revenue_ytd);
+      const ebitda   = n(r.ebitda_ytd);
+      const revPrior = n(r.revenue_ytd_prior);
+      const ebitPrior = n(r.ebitda_ytd_prior);
+      return {
+        companyId:          r.company_id,
+        companyName:        r.company_name,
+        revenue,
+        ebitda,
+        ebitdaMargin:       revenue && ebitda !== null ? ebitda / revenue : null,
+        resultado:          n(r.resultado_ytd),
+        revenueVsPriorPct:  pct(revenue, revPrior),
+        ebitdaVsPriorPct:   pct(ebitda, ebitPrior),
+      };
+    })
+  );
 }

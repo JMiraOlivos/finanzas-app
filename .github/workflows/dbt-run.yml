@@ -1,6 +1,10 @@
 name: dbt — run + test
 
 on:
+  push:
+    branches: [master, main]
+    paths:
+      - "dbt/**"
   repository_dispatch:
     types: [dbt-run]
   workflow_dispatch:

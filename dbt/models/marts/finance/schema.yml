@@ -34,6 +34,19 @@ models:
               arguments:
                 values: ['actual', 'budget', 'forecast']
 
+  - name: fct_dashboard_kpis
+    description: >
+      KPIs YTD del dashboard ejecutivo por (empresa, período).
+      Incluye real, año anterior y presupuesto para cálculo de varianzas.
+      El API suma empresas permitidas y deriva ratios (márgenes, vs_prior, vs_budget).
+    columns:
+      - name: company_id
+        tests: [not_null]
+      - name: period_month
+        tests: [not_null]
+      - name: revenue_ytd
+        description: "Ingresos acumulados YTD (scenario actual)."
+
   - name: dq_financial_control
     description: >
       Control de calidad por carga procesada: semáforo green/yellow/red,
