@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { ScenarioKpiCard } from "@/components/dashboard/ScenarioKpiCard";
 import { AlertsPanel, type Alert } from "@/components/dashboard/AlertsPanel";
 import { ClosureStatusPanel, type ControlRow } from "@/components/dashboard/ClosureStatusPanel";
 import { CompanyRanking, type CompanyRankingRow } from "@/components/dashboard/CompanyRanking";
+import { ActiveFiltersBar } from "@/components/dashboard/ActiveFiltersBar";
+import { VarianceDriversPanel } from "@/components/dashboard/VarianceDriversPanel";
 import type { ChartsData } from "@/components/dashboard/DashboardCharts";
 
 const DashboardCharts = dynamic(
@@ -38,47 +41,81 @@ function defaultPeriod() {
   return `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}-${lastDay}`;
 }
 
-export default function DashboardPage() {
-  const [period,         setPeriod]         = useState(defaultPeriod);
+function DashboardContent() {
+  const router     = useRouter();
+  const pathname   = usePathname();
+  const sp         = useSearchParams();
+
+  const periodParam    = sp.get("period");
+  const companyIdParam = sp.get("companyId");
+  const metricParam    = sp.get("metric");
+
+  const [period, setPeriodState] = useState(periodParam ?? defaultPeriod());
+
   const [kpis,           setKpis]           = useState<KpiMetric[]>([]);
   const [chartsData,     setChartsData]     = useState<ChartsData | null>(null);
-  const [ranking,         setRanking]         = useState<CompanyRankingRow[]>([]);
-  const [alerts,          setAlerts]          = useState<Alert[]>([]);
-  const [control,         setControl]         = useState<ControlRow[]>([]);
-  const [kpisLoading,     setKpisLoading]     = useState(true);
-  const [chartsLoading,   setChartsLoading]   = useState(true);
-  const [rankingLoading,  setRankingLoading]  = useState(true);
-  const [alertsLoading,   setAlertsLoading]   = useState(true);
-  const [controlLoading,  setControlLoading]  = useState(true);
-  const [error,           setError]           = useState<string | null>(null);
+  const [ranking,        setRanking]        = useState<CompanyRankingRow[]>([]);
+  const [alerts,         setAlerts]         = useState<Alert[]>([]);
+  const [control,        setControl]        = useState<ControlRow[]>([]);
+  const [kpisLoading,    setKpisLoading]    = useState(true);
+  const [chartsLoading,  setChartsLoading]  = useState(true);
+  const [rankingLoading, setRankingLoading] = useState(true);
+  const [alertsLoading,  setAlertsLoading]  = useState(true);
+  const [controlLoading, setControlLoading] = useState(true);
+  const [error,          setError]          = useState<string | null>(null);
+
+  function setFilter(key: string, value: string | null) {
+    const params = new URLSearchParams(sp.toString());
+    if (value) params.set(key, value); else params.delete(key);
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
+  function setPeriod(p: string) {
+    setPeriodState(p);
+    setFilter("period", p);
+  }
+
+  function clearFilters() {
+    const params = new URLSearchParams();
+    if (period !== defaultPeriod()) params.set("period", period);
+    router.push(params.toString() ? `${pathname}?${params.toString()}` : pathname);
+  }
+
+  const companyIdsParam = companyIdParam ?? undefined;
 
   const fetchKpis = useCallback(() => {
     setKpisLoading(true);
     setError(null);
-    fetch(`/api/dashboard?period=${period}`)
+    const qs = new URLSearchParams({ period });
+    if (companyIdsParam) qs.set("companyIds", companyIdsParam);
+    fetch(`/api/dashboard?${qs}`)
       .then((r) => { if (!r.ok) throw new Error(`Error ${r.status}`); return r.json() as Promise<KpiMetric[]>; })
       .then(setKpis)
       .catch((e: Error) => setError(e.message))
       .finally(() => setKpisLoading(false));
-  }, [period]);
+  }, [period, companyIdsParam]);
 
   const fetchCharts = useCallback(() => {
     setChartsLoading(true);
-    fetch(`/api/dashboard/charts?period=${period}`)
+    const qs = new URLSearchParams({ period });
+    if (companyIdsParam) qs.set("companyIds", companyIdsParam);
+    fetch(`/api/dashboard/charts?${qs}`)
       .then((r) => r.json() as Promise<ChartsData>)
       .then(setChartsData)
       .catch(() => {})
       .finally(() => setChartsLoading(false));
-  }, [period]);
+  }, [period, companyIdsParam]);
 
   const fetchRanking = useCallback(() => {
     setRankingLoading(true);
-    fetch(`/api/dashboard/ranking?period=${period}`)
+    const qs = new URLSearchParams({ period });
+    if (companyIdsParam) qs.set("companyIds", companyIdsParam);
+    fetch(`/api/dashboard/ranking?${qs}`)
       .then((r) => r.json() as Promise<CompanyRankingRow[]>)
       .then(setRanking)
       .catch(() => {})
       .finally(() => setRankingLoading(false));
-  }, [period]);
+  }, [period, companyIdsParam]);
 
   const fetchAlerts = useCallback(() => {
     setAlertsLoading(true);
@@ -106,13 +143,15 @@ export default function DashboardPage() {
 
   const kpiMap = Object.fromEntries(kpis.map((k) => [k.code, k]));
 
-  // Cards: secondary KPIs (not in FEATURED_CODES and not the vs/attain metrics)
   const secondaryKpis = kpis.filter(
     (k) => !FEATURED_CODES.includes(k.code) &&
             !Object.values(VS_PRIOR_MAP).includes(k.code) &&
             !Object.values(VS_BUDGET_MAP).includes(k.code) &&
             k.code !== "EBITDA_BUDGET_ATTAIN"
   );
+
+  const activeCompanyName = ranking.find((r) => r.companyId === companyIdParam)?.companyName ?? null;
+  const activeMetricLabel = metricParam ? (kpiMap[metricParam]?.label ?? null) : null;
 
   return (
     <div className="space-y-6">
@@ -146,6 +185,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* ── Active Filters Bar ── */}
+      <ActiveFiltersBar
+        companyName={activeCompanyName}
+        metricLabel={activeMetricLabel}
+        onClear={clearFilters}
+      />
+
       {error && (
         <div className="border border-ev-red/30 bg-ev-beige1 px-4 py-3 text-sm text-ev-darkred font-body">{error}</div>
       )}
@@ -168,13 +214,15 @@ export default function DashboardPage() {
                 format={k.format as "currency" | "percentage" | "number"}
                 vsPriorPct={VS_PRIOR_MAP[code]  ? kpiMap[VS_PRIOR_MAP[code]]?.value  : undefined}
                 vsBudgetPct={VS_BUDGET_MAP[code] ? kpiMap[VS_BUDGET_MAP[code]]?.value : undefined}
+                isActive={metricParam === code}
+                onClick={() => setFilter("metric", metricParam === code ? null : code)}
               />
             );
           })}
         </div>
       )}
 
-      {/* Secondary KPIs if any (e.g. monthly metrics) */}
+      {/* Secondary KPIs if any */}
       {!kpisLoading && secondaryKpis.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {secondaryKpis.map((k) => (
@@ -191,14 +239,21 @@ export default function DashboardPage() {
       {/* ── Bloque 2: Alertas + Calidad de datos ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <AlertsPanel alerts={alerts} loading={alertsLoading} />
-
         <ClosureStatusPanel rows={control} loading={controlLoading} />
       </div>
 
       {/* ── Bloque 3: Ranking empresas ── */}
-      <CompanyRanking rows={ranking} loading={rankingLoading} />
+      <CompanyRanking
+        rows={ranking}
+        loading={rankingLoading}
+        activeCompanyId={companyIdParam}
+        onCompanyClick={(id) => setFilter("companyId", companyIdParam === id ? null : id)}
+      />
 
-      {/* ── Bloque 4 & 5: Charts ── */}
+      {/* ── Bloque 4: Variance Drivers ── */}
+      <VarianceDriversPanel period={period} companyIds={companyIdParam} />
+
+      {/* ── Bloque 5 & 6: Charts ── */}
       {chartsLoading ? (
         <div className="space-y-4">
           <div className="border border-ev-gray7 bg-white h-72 animate-pulse" />
@@ -212,5 +267,20 @@ export default function DashboardPage() {
       ) : null}
 
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6 animate-pulse">
+        <div className="h-10 bg-neutral-100 w-64" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[0,1,2,3].map((i) => <div key={i} className="border border-ev-gray7 bg-white p-5 h-28" />)}
+        </div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }

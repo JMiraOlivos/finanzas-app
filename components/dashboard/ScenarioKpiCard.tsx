@@ -6,6 +6,8 @@ type Props = {
   format: "currency" | "percentage" | "number";
   vsPriorPct?: number | null;
   vsBudgetPct?: number | null;
+  onClick?: () => void;
+  isActive?: boolean;
 };
 
 function DeltaBadge({ value, label }: { value: number | null | undefined; label: string }) {
@@ -20,7 +22,7 @@ function DeltaBadge({ value, label }: { value: number | null | undefined; label:
   );
 }
 
-export function ScenarioKpiCard({ label, value, format, vsPriorPct, vsBudgetPct }: Props) {
+export function ScenarioKpiCard({ label, value, format, vsPriorPct, vsBudgetPct, onClick, isActive }: Props) {
   const formatted =
     value === null ? "—"
     : format === "currency"   ? formatCurrency(value)
@@ -31,7 +33,14 @@ export function ScenarioKpiCard({ label, value, format, vsPriorPct, vsBudgetPct 
   const hasBadges  = vsPriorPct != null || vsBudgetPct != null;
 
   return (
-    <div className="border border-ev-gray7 bg-white p-5 flex flex-col gap-2">
+    <div
+      onClick={onClick}
+      className={[
+        "border bg-white p-5 flex flex-col gap-2",
+        onClick ? "cursor-pointer" : "",
+        isActive ? "border-ev-black ring-1 ring-ev-black" : "border-ev-gray7 hover:border-ev-gray4",
+      ].join(" ")}
+    >
       <p className="text-[10px] font-body uppercase tracking-[0.1em] text-ev-gray3">{label}</p>
       <p className={["text-2xl font-head tabular-nums leading-none", isNegative ? "text-ev-red" : "text-ev-black"].join(" ")}>
         {formatted}

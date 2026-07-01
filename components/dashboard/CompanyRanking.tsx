@@ -19,6 +19,8 @@ type SortKey = "revenue" | "ebitda" | "ebitdaMargin" | "resultado";
 type Props = {
   rows: CompanyRankingRow[];
   loading?: boolean;
+  activeCompanyId?: string | null;
+  onCompanyClick?: (companyId: string, companyName: string) => void;
 };
 
 function light(row: CompanyRankingRow): "green" | "yellow" | "red" {
@@ -47,7 +49,7 @@ const COLS: { key: SortKey; label: string }[] = [
   { key: "resultado",    label: "Resultado Final" },
 ];
 
-export function CompanyRanking({ rows, loading }: Props) {
+export function CompanyRanking({ rows, loading, activeCompanyId, onCompanyClick }: Props) {
   const [sort, setSort]   = useState<SortKey>("revenue");
   const [asc,  setAsc]    = useState(false);
 
@@ -106,8 +108,17 @@ export function CompanyRanking({ rows, loading }: Props) {
             )}
             {!loading && sorted.map((row) => {
               const l = light(row);
+              const isActive = activeCompanyId === row.companyId;
               return (
-                <tr key={row.companyId} className="border-t border-ev-gray7 hover:bg-ev-beige2">
+                <tr
+                  key={row.companyId}
+                  onClick={() => onCompanyClick?.(row.companyId, row.companyName)}
+                  className={[
+                    "border-t border-ev-gray7",
+                    onCompanyClick ? "cursor-pointer" : "",
+                    isActive ? "bg-ev-beige1" : "hover:bg-ev-beige2",
+                  ].join(" ")}
+                >
                   <td className="px-3 py-2.5">
                     <span className={["inline-block w-2 h-2 rounded-full", LIGHT_CLS[l]].join(" ")} />
                   </td>

@@ -78,6 +78,7 @@ type RankingRow = {
 };
 type AlertItem = { severity: "red" | "yellow"; message: string; detail?: string };
 type PnlRow = { line_code: string; line_label: string; line_type: string; is_bold: boolean; amount: number };
+type DbDriverRow = { pnl_line_label: string; variance_amount: number; variance_pct: number | null };
 
 // ─── PDF Components ───────────────────────────────────────────────────────────
 function KpiBlock({ label, value, format, vsPrior, vsBudget }: {
@@ -102,13 +103,32 @@ function KpiBlock({ label, value, format, vsPrior, vsBudget }: {
   );
 }
 
-function BoardPackPDF({ period, generatedAt, kpis, ranking, alerts, pnlLines }: {
+function DriversSection({
+  title, rows, positive,
+}: { title: string; rows: DbDriverRow[]; positive: boolean }) {
+  if (rows.length === 0) return null;
+  return React.createElement(View, { style: { marginBottom: 16 } },
+    React.createElement(Text, { style: [S.sectionTitle, { color: positive ? "#527F1F" : EV.red, marginBottom: 6 }] }, title),
+    ...rows.slice(0, 5).map((r, i) =>
+      React.createElement(View, { key: i, style: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 } },
+        React.createElement(Text, { style: [S.tdText, { flex: 3 }] }, r.pnl_line_label),
+        React.createElement(Text, { style: [positive ? S.tdGreen : S.tdRed, { flex: 1, textAlign: "right" }] },
+          `${positive ? "+" : ""}${fmtCur(r.variance_amount)}${r.variance_pct != null ? ` (${fmtPct(r.variance_pct)})` : ""}`
+        ),
+      )
+    ),
+  );
+}
+
+function BoardPackPDF({ period, generatedAt, kpis, ranking, alerts, pnlLines, driversLy, driversBudget }: {
   period: string;
   generatedAt: string;
   kpis: KpiMap;
   ranking: RankingRow[];
   alerts: AlertItem[];
   pnlLines: PnlRow[];
+  driversLy:     { positive: DbDriverRow[]; negative: DbDriverRow[] };
+  driversBudget: { positive: DbDriverRow[]; negative: DbDriverRow[] };
 }) {
   return React.createElement(Document, {},
 
@@ -166,6 +186,21 @@ function BoardPackPDF({ period, generatedAt, kpis, ranking, alerts, pnlLines }: 
       ),
     ),
 
+    // ── Variance Drivers ─────────────────────────────────────────────────────
+    React.createElement(Page, { size: "A4", style: S.page },
+      React.createElement(Text, { style: S.sectionTitle }, "Drivers de Variación YTD"),
+      React.createElement(View, { style: S.divider }),
+
+      React.createElement(Text, { style: [S.sectionTitle, { marginTop: 8 }] }, "vs Año Anterior"),
+      React.createElement(DriversSection, { title: "Drivers positivos", rows: driversLy.positive, positive: true }),
+      React.createElement(DriversSection, { title: "Drivers negativos", rows: driversLy.negative, positive: false }),
+
+      React.createElement(View, { style: S.divider }),
+      React.createElement(Text, { style: S.sectionTitle }, "vs Presupuesto"),
+      React.createElement(DriversSection, { title: "Drivers positivos", rows: driversBudget.positive, positive: true }),
+      React.createElement(DriversSection, { title: "Drivers negativos", rows: driversBudget.negative, positive: false }),
+    ),
+
     // ── Consolidated P&L ─────────────────────────────────────────────────────
     React.createElement(Page, { size: "A4", style: S.page },
       React.createElement(Text, { style: S.sectionTitle }, "Estado de Resultados Consolidado YTD"),
@@ -206,7 +241,7 @@ export async function GET(request: NextRequest) {
     a !== null && b ? (a - b) / Math.abs(b) : null;
 
   // Fetch all data in parallel
-  const [kpiAndRankRows, alertRows, pnlRows] = await Promise.all([
+  const [kpiAndRankRows, alertRows, pnlRows, driversLyRows, driversBudgetRows] = await Promise.all([
     // KPIs + ranking from fct_dashboard_kpis (replaces fn_dashboard_kpis + fn_pnl_ytd x2)
     allowedIds === null
       ? sql`
@@ -267,6 +302,16 @@ export async function GET(request: NextRequest) {
     allowedIds === null
       ? sql`SELECT line_code, line_label, line_type, is_bold, SUM(amount) AS amount FROM finanzas.fn_pnl_ytd(${period}::date, NULL) GROUP BY line_code, line_label, line_type, is_bold, sort_order ORDER BY sort_order`
       : sql`SELECT line_code, line_label, line_type, is_bold, SUM(amount) AS amount FROM finanzas.fn_pnl_ytd(${period}::date, ${allowedIds}::uuid[]) GROUP BY line_code, line_label, line_type, is_bold, sort_order ORDER BY sort_order`,
+
+    // Drivers vs LY
+    allowedIds === null
+      ? sql`SELECT pnl_line_label, SUM(variance_vs_ly) AS variance_amount, CASE WHEN SUM(ly_ytd)!=0 THEN SUM(variance_vs_ly)/ABS(SUM(ly_ytd)) ELSE NULL END AS variance_pct FROM finanzas.fct_variance_drivers WHERE period_month = date_trunc('month', ${period}::date)::date GROUP BY pnl_line_code, pnl_line_label ORDER BY ABS(SUM(variance_vs_ly)) DESC NULLS LAST LIMIT 10`
+      : sql`SELECT pnl_line_label, SUM(variance_vs_ly) AS variance_amount, CASE WHEN SUM(ly_ytd)!=0 THEN SUM(variance_vs_ly)/ABS(SUM(ly_ytd)) ELSE NULL END AS variance_pct FROM finanzas.fct_variance_drivers WHERE period_month = date_trunc('month', ${period}::date)::date AND company_id = ANY(${allowedIds}::uuid[]) GROUP BY pnl_line_code, pnl_line_label ORDER BY ABS(SUM(variance_vs_ly)) DESC NULLS LAST LIMIT 10`,
+
+    // Drivers vs Budget
+    allowedIds === null
+      ? sql`SELECT pnl_line_label, SUM(variance_vs_budget) AS variance_amount, CASE WHEN SUM(budget_ytd)!=0 THEN SUM(variance_vs_budget)/ABS(SUM(budget_ytd)) ELSE NULL END AS variance_pct FROM finanzas.fct_variance_drivers WHERE period_month = date_trunc('month', ${period}::date)::date GROUP BY pnl_line_code, pnl_line_label ORDER BY ABS(SUM(variance_vs_budget)) DESC NULLS LAST LIMIT 10`
+      : sql`SELECT pnl_line_label, SUM(variance_vs_budget) AS variance_amount, CASE WHEN SUM(budget_ytd)!=0 THEN SUM(variance_vs_budget)/ABS(SUM(budget_ytd)) ELSE NULL END AS variance_pct FROM finanzas.fct_variance_drivers WHERE period_month = date_trunc('month', ${period}::date)::date AND company_id = ANY(${allowedIds}::uuid[]) GROUP BY pnl_line_code, pnl_line_label ORDER BY ABS(SUM(variance_vs_budget)) DESC NULLS LAST LIMIT 10`,
   ]);
 
   // Build consolidated KPIs by summing across all companies
@@ -328,13 +373,28 @@ export async function GET(request: NextRequest) {
     amount:     Number(r.amount),
   }));
 
+  // Build drivers data
+  const toDriverRow = (r: Record<string, unknown>): DbDriverRow => ({
+    pnl_line_label: r.pnl_line_label as string,
+    variance_amount: Number(r.variance_amount),
+    variance_pct: r.variance_pct !== null && r.variance_pct !== undefined ? Number(r.variance_pct) : null,
+  });
+  const driversLy = {
+    positive: driversLyRows.filter((r) => Number(r.variance_amount) > 0).map(toDriverRow),
+    negative: driversLyRows.filter((r) => Number(r.variance_amount) < 0).map(toDriverRow),
+  };
+  const driversBudget = {
+    positive: driversBudgetRows.filter((r) => Number(r.variance_amount) > 0).map(toDriverRow),
+    negative: driversBudgetRows.filter((r) => Number(r.variance_amount) < 0).map(toDriverRow),
+  };
+
   // Generate PDF
   const periodLabel = period.slice(0, 7);
   const generatedAt = new Date().toLocaleDateString("es-CL", { year: "numeric", month: "long", day: "numeric" });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const buffer = await renderToBuffer(
-    React.createElement(BoardPackPDF, { period: periodLabel, generatedAt, kpis, ranking, alerts, pnlLines }) as any
+    React.createElement(BoardPackPDF, { period: periodLabel, generatedAt, kpis, ranking, alerts, pnlLines, driversLy, driversBudget }) as any
   );
 
   return new NextResponse(new Uint8Array(buffer), {

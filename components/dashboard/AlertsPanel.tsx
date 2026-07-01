@@ -4,6 +4,7 @@ export type Alert = {
   severity: "red" | "yellow";
   message: string;
   detail?: string;
+  href?: string;
 };
 
 type Props = {
@@ -38,15 +39,19 @@ export function AlertsPanel({ alerts, loading }: Props) {
 
       {!loading && alerts.map((a, i) => {
         const s = SEVERITY[a.severity];
-        return (
-          <div key={i} className={["flex items-start gap-3 rounded px-3 py-2 text-sm border", s.bg, s.border].join(" ")}>
+        const inner = (
+          <>
             <span className={["w-2 h-2 rounded-full mt-1 shrink-0", s.dot].join(" ")} />
             <div>
               <span className={["font-body font-medium", s.text].join(" ")}>{a.message}</span>
               {a.detail && <span className={["block text-xs mt-0.5 font-body", s.text].join(" ")}>{a.detail}</span>}
             </div>
-          </div>
+          </>
         );
+        const cls = ["flex items-start gap-3 rounded px-3 py-2 text-sm border", s.bg, s.border].join(" ");
+        return a.href
+          ? <a key={i} href={a.href} className={[cls, "hover:opacity-80 transition-opacity"].join(" ")}>{inner}</a>
+          : <div key={i} className={cls}>{inner}</div>;
       })}
     </div>
   );

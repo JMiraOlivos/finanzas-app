@@ -9,14 +9,22 @@ export async function GET(request: NextRequest) {
 
   const user = session.user as { id: string; role: string };
   const { searchParams } = new URL(request.url);
-  const period = searchParams.get("period");
+  const period  = searchParams.get("period");
+  const rawIds  = searchParams.get("companyIds");
   if (!period) return NextResponse.json({ error: "Missing period" }, { status: 400 });
 
   const allowedIds = await getAllowedCompanyIds(user.id, user.role);
 
+  // Intersect requested company IDs with allowed ones
+  let companyIds: string[] | null = allowedIds;
+  if (rawIds) {
+    const requested = rawIds.split(",").map((s) => s.trim()).filter(Boolean);
+    companyIds = allowedIds === null ? requested : requested.filter((id) => allowedIds.includes(id));
+  }
+
   // Use the latest available period ≤ requested (matches fn_pnl_ytd semantics:
   // if Jun has no uploads yet, show YTD through May instead of empty)
-  const rows = allowedIds === null
+  const rows = companyIds === null
     ? await sql`
         WITH latest AS (
           SELECT MAX(period_month) AS pm
@@ -42,7 +50,7 @@ export async function GET(request: NextRequest) {
           SELECT MAX(period_month) AS pm
           FROM finanzas.fct_dashboard_kpis
           WHERE period_month <= date_trunc('month', ${period}::date)::date
-            AND company_id = ANY(${allowedIds}::uuid[])
+            AND company_id = ANY(${companyIds}::uuid[])
         )
         SELECT
           SUM(revenue_ytd)        AS revenue_ytd,
@@ -57,7 +65,7 @@ export async function GET(request: NextRequest) {
         FROM finanzas.fct_dashboard_kpis
         CROSS JOIN latest
         WHERE period_month = latest.pm
-          AND company_id = ANY(${allowedIds}::uuid[])
+          AND company_id = ANY(${companyIds}::uuid[])
       `;
 
   if (!rows[0]) return NextResponse.json([]);

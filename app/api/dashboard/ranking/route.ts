@@ -10,11 +10,18 @@ export async function GET(request: NextRequest) {
   const user = session.user as { id: string; role: string };
   const { searchParams } = new URL(request.url);
   const period = searchParams.get("period");
+  const rawIds = searchParams.get("companyIds");
   if (!period) return NextResponse.json({ error: "Missing period" }, { status: 400 });
 
   const allowedIds = await getAllowedCompanyIds(user.id, user.role);
 
-  const rows = allowedIds === null
+  let companyIds: string[] | null = allowedIds;
+  if (rawIds) {
+    const requested = rawIds.split(",").map((s) => s.trim()).filter(Boolean);
+    companyIds = allowedIds === null ? requested : requested.filter((id) => allowedIds.includes(id));
+  }
+
+  const rows = companyIds === null
     ? await sql`
         WITH latest AS (
           SELECT MAX(period_month) AS pm
@@ -34,7 +41,7 @@ export async function GET(request: NextRequest) {
           SELECT MAX(period_month) AS pm
           FROM finanzas.fct_dashboard_kpis
           WHERE period_month <= date_trunc('month', ${period}::date)::date
-            AND company_id = ANY(${allowedIds}::uuid[])
+            AND company_id = ANY(${companyIds}::uuid[])
         )
         SELECT company_id, company_name,
                revenue_ytd, ebitda_ytd, resultado_ytd,
@@ -42,7 +49,7 @@ export async function GET(request: NextRequest) {
         FROM finanzas.fct_dashboard_kpis
         CROSS JOIN latest
         WHERE period_month = latest.pm
-          AND company_id = ANY(${allowedIds}::uuid[])
+          AND company_id = ANY(${companyIds}::uuid[])
         ORDER BY revenue_ytd DESC NULLS LAST
       `;
 

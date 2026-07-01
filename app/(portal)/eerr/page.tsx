@@ -111,7 +111,7 @@ export default function EerrPage() {
           period={period}
           pnlLineCode={drawerParams.pnlLineCode}
           pnlLineLabel={drawerParams.pnlLineLabel}
-          viewMode={mode === "lmonth" || mode === "vs_budget" ? "ytd" : mode}
+          viewMode={mode === "lmonth" || mode === "vs_budget" || mode === "vs_ly" || mode === "vs_ly_budget" ? "ytd" : mode}
         />
       )}
     </div>

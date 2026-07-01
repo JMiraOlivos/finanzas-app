@@ -2,7 +2,7 @@
 
 type Company = { id: string; name: string };
 
-export type EerrMode = "ytd" | "lmonth" | "vs_budget";
+export type EerrMode = "ytd" | "lmonth" | "vs_budget" | "vs_ly" | "vs_ly_budget";
 
 type Props = {
   companies: Company[];
@@ -67,7 +67,7 @@ export function EerrFilters({
       {/* Mode toggle */}
       {onModeChange && (
         <div className="flex border border-ev-gray6 overflow-hidden text-xs">
-          {(["ytd", "lmonth", "vs_budget"] as EerrMode[]).map((m, i) => (
+          {(["ytd", "lmonth", "vs_budget", "vs_ly", "vs_ly_budget"] as EerrMode[]).map((m, i) => (
             <button
               key={m}
               onClick={() => onModeChange(m)}
@@ -77,7 +77,15 @@ export function EerrFilters({
                 mode === m ? "bg-ev-black text-white" : "bg-white text-ev-gray2 hover:bg-ev-beige2",
               ].join(" ")}
             >
-              {m === "ytd" ? "YTD" : m === "lmonth" ? "Mes + YTD" : "vs Ppto."}
+              {m === "ytd"
+                ? "YTD"
+                : m === "lmonth"
+                ? "Mes + YTD"
+                : m === "vs_budget"
+                ? "vs Ppto."
+                : m === "vs_ly"
+                ? "vs LY"
+                : "vs LY + Ppto"}
             </button>
           ))}
         </div>

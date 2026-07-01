@@ -47,6 +47,38 @@ models:
       - name: revenue_ytd
         description: "Ingresos acumulados YTD (scenario actual)."
 
+  - name: fct_pnl_ytd_comparison
+    description: >
+      YTD acumulado por (empresa, línea de detalle, período): real actual, año anterior y presupuesto.
+      Usa window functions sobre fct_pnl_monthly y stg_budget_monthly.
+      Subtotales y líneas calculadas se derivan en query time por fn_pnl_ytd_comparison.
+    columns:
+      - name: company_id
+        tests: [not_null]
+      - name: pnl_line_code
+        tests: [not_null]
+      - name: period_month
+        tests: [not_null]
+      - name: actual_ytd
+        description: "YTD acumulado del año en curso (real)."
+      - name: ly_ytd
+        description: "YTD acumulado del mismo período del año anterior."
+      - name: budget_ytd
+        description: "YTD acumulado del presupuesto activo del año en curso."
+
+  - name: fct_variance_drivers
+    description: >
+      Varianzas vs año anterior y vs presupuesto agrupadas al nivel de línea P&L padre
+      (RRHH, MARKETING, INGRESOS, etc.) por empresa y período.
+      Base para el panel de drivers del dashboard.
+    columns:
+      - name: company_id
+        tests: [not_null]
+      - name: pnl_line_code
+        tests: [not_null]
+      - name: period_month
+        tests: [not_null]
+
   - name: dq_financial_control
     description: >
       Control de calidad por carga procesada: semáforo green/yellow/red,

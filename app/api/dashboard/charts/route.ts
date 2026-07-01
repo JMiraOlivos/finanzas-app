@@ -26,16 +26,23 @@ export async function GET(request: NextRequest) {
   const user = session.user as { id: string; role: string };
   const { searchParams } = new URL(request.url);
   const period = searchParams.get("period");
+  const rawIds = searchParams.get("companyIds");
   if (!period) return NextResponse.json({ error: "Missing period" }, { status: 400 });
 
   const year = Number(period.slice(0, 4));
   const allowedIds = await getAllowedCompanyIds(user.id, user.role);
 
+  let companyIds: string[] | null = allowedIds;
+  if (rawIds) {
+    const requested = rawIds.split(",").map((s) => s.trim()).filter(Boolean);
+    companyIds = allowedIds === null ? requested : requested.filter((id) => allowedIds.includes(id));
+  }
+
   const [monthlyData, ytdData] = await Promise.all([
     // Monthly trend via fn_pnl_monthly — backed by fct_pnl_monthly after 012 migration.
     // Using the function (not the mart directly) because INGRESOS and EBITDA are
     // subtotal/calculated lines not present in fct_pnl_monthly detail rows.
-    allowedIds === null
+    companyIds === null
       ? sql`
           SELECT line_code,
                  EXTRACT(MONTH FROM period_month)::int AS month_num,
@@ -47,12 +54,12 @@ export async function GET(request: NextRequest) {
           SELECT line_code,
                  EXTRACT(MONTH FROM period_month)::int AS month_num,
                  SUM(amount) AS amount
-          FROM finanzas.fn_pnl_monthly(${year}::int, ${allowedIds}::uuid[])
+          FROM finanzas.fn_pnl_monthly(${year}::int, ${companyIds}::uuid[])
           WHERE line_code IN ('INGRESOS', 'EBITDA')
           GROUP BY line_code, month_num`,
 
     // YTD breakdown and company comparison
-    allowedIds === null
+    companyIds === null
       ? sql`
           SELECT company_id, company_name, line_code, amount
           FROM finanzas.fn_pnl_ytd(${period}::date, NULL)
@@ -62,7 +69,7 @@ export async function GET(request: NextRequest) {
           )`
       : sql`
           SELECT company_id, company_name, line_code, amount
-          FROM finanzas.fn_pnl_ytd(${period}::date, ${allowedIds}::uuid[])
+          FROM finanzas.fn_pnl_ytd(${period}::date, ${companyIds}::uuid[])
           WHERE line_code IN (
             'INGRESOS','RRHH','GASTOS_VARIABLES','MARKETING',
             'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA'
