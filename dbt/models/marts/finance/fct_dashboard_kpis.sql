@@ -6,7 +6,12 @@ with monthly_actual as (
     select
         company_id,
         period_month,
+        -- Match detail lines (parent_code) OR subtotal lines (pnl_line_code) to handle
+        -- both actual data (stored at detail level) and budget data (may be at subtotal level).
         sum(case when pnl_line_code in (
+                'INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
+                'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA','NO_OPERACIONALES'
+            ) or parent_code in (
                 'INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
                 'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA','NO_OPERACIONALES'
             ) then amount else 0 end)                                           as ebitda_monthly,
@@ -14,10 +19,14 @@ with monthly_actual as (
                 'INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
                 'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA',
                 'NO_OPERACIONALES','INTERESES_DEPR','IMPUESTO'
+            ) or parent_code in (
+                'INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
+                'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA',
+                'NO_OPERACIONALES','INTERESES_DEPR','IMPUESTO'
             ) then amount else 0 end)                                           as resultado_monthly,
-        sum(case when pnl_line_code = 'INGRESOS'  then amount else 0 end)      as revenue_monthly,
-        sum(case when pnl_line_code = 'RRHH'      then amount else 0 end)      as rrhh_monthly,
-        sum(case when pnl_line_code = 'MARKETING' then amount else 0 end)      as mkt_monthly
+        sum(case when pnl_line_code = 'INGRESOS'  or parent_code = 'INGRESOS'  then amount else 0 end) as revenue_monthly,
+        sum(case when pnl_line_code = 'RRHH'      or parent_code = 'RRHH'      then amount else 0 end) as rrhh_monthly,
+        sum(case when pnl_line_code = 'MARKETING' or parent_code = 'MARKETING' then amount else 0 end) as mkt_monthly
     from {{ ref('fct_scenario_monthly') }}
     where scenario = 'actual'
     group by company_id, period_month
@@ -30,8 +39,11 @@ monthly_budget as (
         sum(case when pnl_line_code in (
                 'INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
                 'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA','NO_OPERACIONALES'
+            ) or parent_code in (
+                'INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
+                'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA','NO_OPERACIONALES'
             ) then amount else 0 end)                                           as ebitda_monthly,
-        sum(case when pnl_line_code = 'INGRESOS'  then amount else 0 end)      as revenue_monthly
+        sum(case when pnl_line_code = 'INGRESOS'  or parent_code = 'INGRESOS'  then amount else 0 end) as revenue_monthly
     from {{ ref('fct_scenario_monthly') }}
     where scenario = 'budget'
     group by company_id, period_month
