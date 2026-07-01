@@ -162,7 +162,7 @@ export function FinancialStatementTable({
                     const isRed =
                       typeof value === "number" && value !== 0 &&
                       (isExpenseRow || (row.lineType === "calculated" && value < 0));
-                    const clickable = !!onCellClick && row.lineType !== "calculated";
+                    const clickable = !!onCellClick && row.lineType !== "calculated" && !col.isAggregate;
 
                     return (
                       <td

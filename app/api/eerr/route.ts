@@ -125,6 +125,49 @@ function buildPayload(data: Record<string, unknown>[], mode: string, period: str
   }
 
   const rows = Array.from(lineMap.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const TOTAL = "__TOTAL__";
+  if (companies.length > 1) {
+    if (mode === "lmonth") {
+      for (const row of rows) {
+        let sumL = 0, sumY = 0;
+        for (const { id: cid } of companies) {
+          sumL += row.values[`${cid}|amount_lmonth`] ?? 0;
+          sumY += row.values[`${cid}|amount_ytd`]   ?? 0;
+        }
+        row.values[`${TOTAL}|amount_lmonth`] = sumL;
+        row.values[`${TOTAL}|amount_ytd`]    = sumY;
+      }
+      const revYtd = rows.find((r) => r.code === "INGRESOS")?.values[`${TOTAL}|amount_ytd`] ?? null;
+      for (const row of rows) {
+        const ytd = row.values[`${TOTAL}|amount_ytd`];
+        row.values[`${TOTAL}|revenue_pct_ytd`] =
+          revYtd && revYtd !== 0 && ytd != null ? ytd / revYtd : null;
+      }
+      columnGroups.push({ id: TOTAL, label: "Total", columns: [
+        { id: `${TOTAL}|amount_lmonth`,   label: "Mes",     type: "currency",   isAggregate: true },
+        { id: `${TOTAL}|amount_ytd`,      label: "YTD",     type: "currency",   isAggregate: true },
+        { id: `${TOTAL}|revenue_pct_ytd`, label: "% Ingr.", type: "percentage", isAggregate: true },
+      ]});
+    } else {
+      for (const row of rows) {
+        let sum = 0;
+        for (const { id: cid } of companies) sum += row.values[`${cid}|amount`] ?? 0;
+        row.values[`${TOTAL}|amount`] = sum;
+      }
+      const rev = rows.find((r) => r.code === "INGRESOS")?.values[`${TOTAL}|amount`] ?? null;
+      for (const row of rows) {
+        const amt = row.values[`${TOTAL}|amount`];
+        row.values[`${TOTAL}|revenue_percentage`] =
+          rev && rev !== 0 && amt != null ? amt / rev : null;
+      }
+      columnGroups.push({ id: TOTAL, label: "Total", columns: [
+        { id: `${TOTAL}|amount`,             label: "M CLP",   type: "currency",   isAggregate: true },
+        { id: `${TOTAL}|revenue_percentage`, label: "% Ingr.", type: "percentage", isAggregate: true },
+      ]});
+    }
+  }
+
   const periodLabel = formatPeriodMonth(period);
 
   return {

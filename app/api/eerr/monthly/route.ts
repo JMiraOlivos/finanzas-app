@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
   const rows = Array.from(lineMap.values()).sort((a, b) => a.sortOrder - b.sortOrder);
   return NextResponse.json({
     title: `Estado de Resultados Mensual ${year}`,
+    periodLabel: String(year),
     columnGroups,
     rows,
   });

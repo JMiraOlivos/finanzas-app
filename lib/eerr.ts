@@ -2,6 +2,7 @@ export type FinancialColumn = {
   id: string;
   label: string;
   type: "currency" | "percentage" | "number";
+  isAggregate?: boolean;  // true for Total column — disables drilldown click
 };
 
 export type FinancialColumnGroup = {
