@@ -16,19 +16,31 @@ export async function GET(request: NextRequest) {
 
   const rows = allowedIds === null
     ? await sql`
+        WITH latest AS (
+          SELECT MAX(period_month) AS pm
+          FROM finanzas.fct_dashboard_kpis
+          WHERE period_month <= date_trunc('month', ${period}::date)::date
+        )
         SELECT company_id, company_name,
                revenue_ytd, ebitda_ytd, resultado_ytd,
                revenue_ytd_prior, ebitda_ytd_prior
         FROM finanzas.fct_dashboard_kpis
-        WHERE period_month = date_trunc('month', ${period}::date)::date
+        CROSS JOIN latest
+        WHERE period_month = latest.pm
         ORDER BY revenue_ytd DESC NULLS LAST
       `
     : await sql`
+        WITH latest AS (
+          SELECT MAX(period_month) AS pm
+          FROM finanzas.fct_dashboard_kpis
+          WHERE period_month <= date_trunc('month', ${period}::date)::date
+        )
         SELECT company_id, company_name,
                revenue_ytd, ebitda_ytd, resultado_ytd,
                revenue_ytd_prior, ebitda_ytd_prior
         FROM finanzas.fct_dashboard_kpis
-        WHERE period_month = date_trunc('month', ${period}::date)::date
+        CROSS JOIN latest
+        WHERE period_month = latest.pm
           AND company_id = ANY(${allowedIds}::uuid[])
         ORDER BY revenue_ytd DESC NULLS LAST
       `;

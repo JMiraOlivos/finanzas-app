@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
         JOIN finanzas.companies c ON c.id = bm.company_id
         JOIN finanzas.pnl_lines pl ON pl.id = bm.pnl_line_id
         WHERE bv.is_active = TRUE
-          AND pl.line_code = 'INGRESOS'
+          AND pl.code = 'INGRESOS'
           AND bm.period_month <= ${period}::date
           AND bm.period_month >= date_trunc('year', ${period}::date)
         GROUP BY c.id, c.name`
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
         JOIN finanzas.companies c ON c.id = bm.company_id
         JOIN finanzas.pnl_lines pl ON pl.id = bm.pnl_line_id
         WHERE bv.is_active = TRUE
-          AND pl.line_code = 'INGRESOS'
+          AND pl.code = 'INGRESOS'
           AND bm.company_id = ANY(${allowedIds}::uuid[])
           AND bm.period_month <= ${period}::date
           AND bm.period_month >= date_trunc('year', ${period}::date)

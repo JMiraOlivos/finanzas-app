@@ -14,8 +14,15 @@ export async function GET(request: NextRequest) {
 
   const allowedIds = await getAllowedCompanyIds(user.id, user.role);
 
+  // Use the latest available period ≤ requested (matches fn_pnl_ytd semantics:
+  // if Jun has no uploads yet, show YTD through May instead of empty)
   const rows = allowedIds === null
     ? await sql`
+        WITH latest AS (
+          SELECT MAX(period_month) AS pm
+          FROM finanzas.fct_dashboard_kpis
+          WHERE period_month <= date_trunc('month', ${period}::date)::date
+        )
         SELECT
           SUM(revenue_ytd)        AS revenue_ytd,
           SUM(ebitda_ytd)         AS ebitda_ytd,
@@ -27,9 +34,15 @@ export async function GET(request: NextRequest) {
           SUM(revenue_ytd_budget) AS revenue_ytd_budget,
           SUM(ebitda_ytd_budget)  AS ebitda_ytd_budget
         FROM finanzas.fct_dashboard_kpis
-        WHERE period_month = date_trunc('month', ${period}::date)::date
+        CROSS JOIN latest
+        WHERE period_month = latest.pm
       `
     : await sql`
+        WITH latest AS (
+          SELECT MAX(period_month) AS pm
+          FROM finanzas.fct_dashboard_kpis
+          WHERE period_month <= date_trunc('month', ${period}::date)::date
+        )
         SELECT
           SUM(revenue_ytd)        AS revenue_ytd,
           SUM(ebitda_ytd)         AS ebitda_ytd,
@@ -41,7 +54,8 @@ export async function GET(request: NextRequest) {
           SUM(revenue_ytd_budget) AS revenue_ytd_budget,
           SUM(ebitda_ytd_budget)  AS ebitda_ytd_budget
         FROM finanzas.fct_dashboard_kpis
-        WHERE period_month = date_trunc('month', ${period}::date)::date
+        CROSS JOIN latest
+        WHERE period_month = latest.pm
           AND company_id = ANY(${allowedIds}::uuid[])
       `;
 
