@@ -4,6 +4,12 @@ import { useState } from "react";
 import { FinancialColumnGroup, FinancialRow } from "@/lib/eerr";
 import { formatFinancialValue } from "@/lib/formatters";
 
+const EXPENSE_CODES = new Set([
+  "GASTOS_VARIABLES", "RRHH", "MARKETING", "GASTOS_ADMIN",
+  "ASESORIAS", "GASTOS_OFICINA", "TECNOLOGIA", "NO_OPERACIONALES",
+  "INTERESES_DEPR", "IMPUESTO",
+]);
+
 type CellClickParams = {
   row: FinancialRow;
   companyId: string;
@@ -149,7 +155,13 @@ export function FinancialStatementTable({
                   {/* Value cells */}
                   {flatColumns.map((col) => {
                     const value = row.values[col.id] ?? null;
-                    const isNegative = typeof value === "number" && value < 0;
+                    const isExpenseRow =
+                      EXPENSE_CODES.has(row.code) ||
+                      EXPENSE_CODES.has(row.parentCode ?? "");
+                    // Expense rows → red when non-zero; calculated rows → red only when negative
+                    const isRed =
+                      typeof value === "number" && value !== 0 &&
+                      (isExpenseRow || (row.lineType === "calculated" && value < 0));
                     const clickable = !!onCellClick && row.lineType !== "calculated";
 
                     return (
@@ -158,7 +170,7 @@ export function FinancialStatementTable({
                         className={[
                           "border-r border-ev-gray7 px-3 py-1.5 text-right tabular-nums whitespace-nowrap",
                           row.isBold ? "font-semibold" : "",
-                          isNegative ? "text-ev-red" : "",
+                          isRed ? "text-ev-red" : "",
                           clickable ? "cursor-pointer hover:bg-yellow-50" : "",
                         ].join(" ")}
                         onClick={() => {
