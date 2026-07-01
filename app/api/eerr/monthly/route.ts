@@ -32,9 +32,16 @@ export async function GET(request: NextRequest) {
     ? await sql`SELECT * FROM finanzas.fn_pnl_monthly(${Number(year)}, NULL)`
     : await sql`SELECT * FROM finanzas.fn_pnl_monthly(${Number(year)}, ${companyIds}::uuid[])`;
 
+  // period_month arrives as a JS Date (postgres.js parses DATE → Date object).
+  // Use toISOString() to get the UTC date string and avoid Chile timezone shift.
+  function toYYYYMM(v: unknown): string {
+    if (v instanceof Date) return v.toISOString().slice(0, 7);
+    return String(v).slice(0, 7);
+  }
+
   // Pivot: rows by (company, line) with months as nested values
   const monthsSet = new Set<string>();
-  for (const r of data) monthsSet.add((r.period_month as string).slice(0, 7)); // "YYYY-MM"
+  for (const r of data) monthsSet.add(toYYYYMM(r.period_month));
   const months = Array.from(monthsSet).sort();
 
   const companyMap = new Map<string, string>();
@@ -77,7 +84,7 @@ export async function GET(request: NextRequest) {
     }
     const line = lineMap.get(code)!;
     const cid = row.company_id as string;
-    const m   = (row.period_month as string).slice(0, 7);
+    const m   = toYYYYMM(row.period_month);
     line.values[`${cid}|${m}`] = row.amount !== null ? Number(row.amount) : null;
   }
 
