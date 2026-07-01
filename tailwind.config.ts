@@ -32,6 +32,7 @@ const config: Config = {
           gray5:   '#999999',
           gray6:   '#B3B3B3',
           gray7:   '#CCCCCC',
+          green:   '#527F1F',
           beige1:  '#E2D9D0',
           beige2:  '#F8F5F0',
         },
