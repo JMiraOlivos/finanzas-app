@@ -36,7 +36,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: 422 });
   }
 
-  void triggerDbtRun();
+  // Only trigger dbt when data is fully committed (no pending mappings)
+  if (result.status === "committed") void triggerDbtRun();
+
   return NextResponse.json(result);
 }
 

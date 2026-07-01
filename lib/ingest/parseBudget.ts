@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 export type BudgetRow = {
   companyName: string;
   periodMonth: string;   // "YYYY-MM-01"
-  pnlLineCode: string;   // code or label — resolved later against DB
+  accountName: string;   // raw account name from file — mapped to pnl_line in loadBudget
   amount: number;
   sourceRow: number;
 };
@@ -66,13 +66,13 @@ export function parseBudgetBuffer(buffer: Buffer, filename: string): BudgetParse
 
   const colEmpresa  = findCol(headers, ["empresa", "company", "compañia"]);
   const colPeriodo  = findCol(headers, ["periodo", "period", "mes", "month"]);
-  const colLinea    = findCol(headers, ["linea_pnl", "linea", "pnl_line", "line", "cuenta"]);
+  const colLinea    = findCol(headers, ["cuenta", "linea_pnl", "linea", "pnl_line", "line"]);
   const colMonto    = findCol(headers, ["monto", "amount", "importe", "valor"]);
 
   const missing: string[] = [];
   if (colEmpresa === null) missing.push("empresa");
   if (colPeriodo === null) missing.push("periodo");
-  if (colLinea   === null) missing.push("linea_pnl");
+  if (colLinea   === null) missing.push("cuenta");
   if (colMonto   === null) missing.push("monto");
 
   if (missing.length > 0) {
@@ -95,10 +95,10 @@ export function parseBudgetBuffer(buffer: Buffer, filename: string): BudgetParse
 
     if (!companyName) { errors.push({ row: srcRow, message: "Empresa vacía" }); continue; }
     if (!periodo)     { errors.push({ row: srcRow, message: `Período inválido: "${row[colPeriodo!]}"` }); continue; }
-    if (!lineaRaw)    { errors.push({ row: srcRow, message: "Línea PnL vacía" }); continue; }
+    if (!lineaRaw)    { errors.push({ row: srcRow, message: "Cuenta vacía" }); continue; }
     if (amount === null) { errors.push({ row: srcRow, message: `Monto inválido: "${row[colMonto!]}"` }); continue; }
 
-    rows.push({ companyName, periodMonth: periodo, pnlLineCode: lineaRaw, amount, sourceRow: srcRow });
+    rows.push({ companyName, periodMonth: periodo, accountName: lineaRaw, amount, sourceRow: srcRow });
   }
 
   return { rows, errors };

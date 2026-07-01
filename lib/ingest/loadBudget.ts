@@ -5,10 +5,20 @@ import { parseBudgetBuffer } from "./parseBudget";
 export type LoadBudgetResult =
   | {
       success: true;
+      status: "committed";
       versionIds: string[];
       rowCount: number;
       companiesLoaded: string[];
       warnings: string[];
+    }
+  | {
+      success: true;
+      status: "pending_mapping";
+      versionIds: string[];
+      rowCount: number;
+      companiesLoaded: string[];
+      warnings: string[];
+      unmapped: string[];  // account names without a mapping
     }
   | { success: false; error: string };
 
@@ -53,40 +63,44 @@ export async function loadBudgetFile(params: {
   if (unknownCompanies.length > 0) {
     return {
       success: false,
-      error: `Empresas no encontradas en la base de datos: ${unknownCompanies.join(", ")}`,
+      error: `Empresas no encontradas: ${unknownCompanies.join(", ")}`,
     };
   }
 
-  // ── 3. Resolve pnl_lines ─────────────────────────────────────────────────
+  // ── 3. Fetch existing budget_account_mappings ─────────────────────────────
 
-  const lineCodes = [...new Set(parsed.rows.map((r) => r.pnlLineCode))];
-  const pnlLines = await sql<{ id: string; code: string; label: string }[]>`
-    SELECT id, code, label FROM finanzas.pnl_lines
-    WHERE LOWER(code) = ANY(${lineCodes.map((c) => c.toLowerCase())})
-       OR LOWER(label) = ANY(${lineCodes.map((c) => c.toLowerCase())})
+  const accountNames = [...new Set(parsed.rows.map((r) => r.accountName))];
+  const companyIds   = [...new Set(Object.values(Object.fromEntries(companyMap)))];
+
+  const mappingRows = await sql<{ account_name: string; company_id: string | null; pnl_line_id: string }[]>`
+    SELECT account_name, company_id, pnl_line_id
+    FROM finanzas.budget_account_mappings
+    WHERE is_active = TRUE
+      AND LOWER(account_name) = ANY(${accountNames.map((n) => n.toLowerCase())})
+      AND (company_id IS NULL OR company_id = ANY(${companyIds}::uuid[]))
   `;
-  // Prefer code match over label match
-  const lineMap = new Map<string, string>();
-  for (const pl of pnlLines) {
-    lineMap.set(pl.code.toLowerCase(),  pl.id);
-    lineMap.set(pl.label.toLowerCase(), pl.id);
-  }
-  // Code match overrides label match
-  for (const pl of pnlLines) {
-    lineMap.set(pl.code.toLowerCase(), pl.id);
-  }
 
-  const unknownLines = lineCodes.filter((c) => !lineMap.has(c.toLowerCase()));
-  if (unknownLines.length > 0) {
-    return {
-      success: false,
-      error: `Líneas PnL no encontradas: ${unknownLines.join(", ")}. Usar código (ej. INGRESOS) o etiqueta exacta.`,
-    };
+  // Build mapping: (accountNameLower, companyId) → pnlLineId
+  // Company-specific mapping takes priority over global (company_id IS NULL)
+  const mappingKey = (name: string, cid: string | null) => `${name.toLowerCase()}|${cid ?? "__global__"}`;
+  const resolvedMap = new Map<string, string>();
+  for (const m of mappingRows) {
+    if (m.company_id === null) resolvedMap.set(mappingKey(m.account_name, null), m.pnl_line_id);
+  }
+  for (const m of mappingRows) {
+    if (m.company_id !== null) resolvedMap.set(mappingKey(m.account_name, m.company_id), m.pnl_line_id);
   }
 
-  // ── 4. Group by company + year → one budget_version each ─────────────────
+  function resolveMapping(accountName: string, companyId: string): string | null {
+    return (
+      resolvedMap.get(mappingKey(accountName, companyId)) ??
+      resolvedMap.get(mappingKey(accountName, null)) ??
+      null
+    );
+  }
 
-  // Determine the year range per company from the rows
+  // ── 4. Group by company + year → create budget_versions ──────────────────
+
   const companyYears = new Map<string, Set<number>>();
   for (const row of parsed.rows) {
     const companyId = companyMap.get(row.companyName.toLowerCase())!;
@@ -98,23 +112,20 @@ export async function loadBudgetFile(params: {
   const versionIds: string[] = [];
 
   try {
-    const txResult = await sql.begin(async (sql) => {
+    const txResult = await sql.begin(async (tx) => {
       const createdVersions: { id: string; companyId: string; year: number }[] = [];
 
       for (const [companyId, years] of companyYears) {
         for (const year of years) {
-          // Deactivate previous active versions for same company+year
-          await sql`
+          await tx`
             UPDATE finanzas.budget_versions
             SET is_active = FALSE
             WHERE company_id = ${companyId}::uuid
               AND year = ${year}
               AND is_active = TRUE
           `;
-
-          // Create new version
           const versionName = `${filename} — ${new Date().toISOString().slice(0, 10)}`;
-          const [vRow] = await sql<{ id: string }[]>`
+          const [vRow] = await tx<{ id: string }[]>`
             INSERT INTO finanzas.budget_versions (company_id, name, year, created_by)
             VALUES (${companyId}::uuid, ${versionName}, ${year}, ${params.uploadedBy ?? null})
             RETURNING id
@@ -123,62 +134,134 @@ export async function loadBudgetFile(params: {
         }
       }
 
-      // Build a map: companyId+year → versionId
       const versionMap = new Map(
         createdVersions.map((v) => [`${v.companyId}:${v.year}`, v.id])
       );
 
-      // Insert budget_monthly rows
-      const values = parsed.rows.map((row) => {
-        const companyId   = companyMap.get(row.companyName.toLowerCase())!;
-        const pnlLineId   = lineMap.get(row.pnlLineCode.toLowerCase())!;
-        const year        = parseInt(row.periodMonth.slice(0, 4), 10);
-        const versionId   = versionMap.get(`${companyId}:${year}`)!;
+      // Insert all rows into budget_staging
+      const stagingValues = parsed.rows.map((row) => {
+        const companyId  = companyMap.get(row.companyName.toLowerCase())!;
+        const year       = parseInt(row.periodMonth.slice(0, 4), 10);
+        const versionId  = versionMap.get(`${companyId}:${year}`)!;
         return {
           version_id:   versionId,
           company_id:   companyId,
-          pnl_line_id:  pnlLineId,
+          account_name: row.accountName,
           period_month: row.periodMonth,
           amount:       row.amount,
+          source_row:   row.sourceRow,
         };
       });
 
       const BATCH = 500;
-      for (let i = 0; i < values.length; i += BATCH) {
-        const batch = values.slice(i, i + BATCH);
-        await sql`
-          INSERT INTO finanzas.budget_monthly
-            ${sql(batch, ["version_id", "company_id", "pnl_line_id", "period_month", "amount"])}
-          ON CONFLICT (version_id, company_id, pnl_line_id, period_month)
-          DO UPDATE SET amount = EXCLUDED.amount
+      for (let i = 0; i < stagingValues.length; i += BATCH) {
+        const batch = stagingValues.slice(i, i + BATCH);
+        await tx`
+          INSERT INTO finanzas.budget_staging
+            ${tx(batch, ["version_id", "company_id", "account_name", "period_month", "amount", "source_row"])}
         `;
       }
 
-      return createdVersions.map((v) => v.id);
+      // Identify unmapped accounts
+      const unmappedSet = new Set<string>();
+      for (const row of parsed.rows) {
+        const companyId = companyMap.get(row.companyName.toLowerCase())!;
+        if (!resolveMapping(row.accountName, companyId)) {
+          unmappedSet.add(row.accountName);
+        }
+      }
+
+      // If all mapped, commit to budget_monthly immediately
+      if (unmappedSet.size === 0) {
+        await commitStagingToMonthly(tx, versionMap, parsed.rows, companyMap, resolveMapping);
+      }
+
+      return { versionIds: createdVersions.map((v) => v.id), unmapped: [...unmappedSet] };
     });
 
-    versionIds.push(...txResult);
+    versionIds.push(...txResult.versionIds);
+
+    await logAudit({
+      userId: params.uploadedBy ?? null,
+      action: "upload_budget",
+      entityType: "budget_version",
+      metadata: {
+        filename,
+        row_count: parsed.rows.length,
+        version_ids: versionIds,
+        companies: companyNames,
+        unmapped_count: txResult.unmapped.length,
+      },
+    });
+
+    if (txResult.unmapped.length > 0) {
+      return {
+        success: true,
+        status: "pending_mapping",
+        versionIds,
+        rowCount: parsed.rows.length,
+        companiesLoaded: companyNames,
+        warnings,
+        unmapped: txResult.unmapped,
+      };
+    }
+
+    return {
+      success: true,
+      status: "committed",
+      versionIds,
+      rowCount: parsed.rows.length,
+      companiesLoaded: companyNames,
+      warnings,
+    };
   } catch (err) {
     return { success: false, error: `Error al guardar presupuesto: ${(err as Error).message}` };
   }
+}
 
-  await logAudit({
-    userId: params.uploadedBy ?? null,
-    action: "upload_budget",
-    entityType: "budget_version",
-    metadata: {
-      filename,
-      row_count: parsed.rows.length,
-      version_ids: versionIds,
-      companies: companyNames,
-    },
-  });
+// Aggregates staging rows into budget_monthly using resolved mappings.
+// Called both from loadBudgetFile (when all mapped) and from the mappings API.
+export async function commitStagingToMonthly(
+  tx: typeof sql,
+  versionMap: Map<string, string>,
+  rows: Array<{ companyName: string; periodMonth: string; accountName: string; amount: number }>,
+  companyMap: Map<string, string>,
+  resolveMapping: (accountName: string, companyId: string) => string | null
+): Promise<void> {
+  // Aggregate: company + period + pnl_line → sum
+  const agg = new Map<string, { versionId: string; companyId: string; pnlLineId: string; periodMonth: string; amount: number }>();
 
-  return {
-    success: true,
-    versionIds,
-    rowCount: parsed.rows.length,
-    companiesLoaded: companyNames,
-    warnings,
-  };
+  for (const row of rows) {
+    const companyId  = companyMap.get(row.companyName.toLowerCase())!;
+    const pnlLineId  = resolveMapping(row.accountName, companyId);
+    if (!pnlLineId) continue; // skip unmapped
+    const year       = parseInt(row.periodMonth.slice(0, 4), 10);
+    const versionId  = versionMap.get(`${companyId}:${year}`)!;
+    const key        = `${versionId}|${companyId}|${pnlLineId}|${row.periodMonth}`;
+    const existing   = agg.get(key);
+    if (existing) {
+      existing.amount += row.amount;
+    } else {
+      agg.set(key, { versionId, companyId, pnlLineId, periodMonth: row.periodMonth, amount: row.amount });
+    }
+  }
+
+  const values = Array.from(agg.values()).map((v) => ({
+    version_id:   v.versionId,
+    company_id:   v.companyId,
+    pnl_line_id:  v.pnlLineId,
+    period_month: v.periodMonth,
+    amount:       v.amount,
+  }));
+
+  const BATCH = 500;
+  for (let i = 0; i < values.length; i += BATCH) {
+    const batch = values.slice(i, i + BATCH);
+    await tx`
+      INSERT INTO finanzas.budget_monthly
+        ${tx(batch, ["version_id", "company_id", "pnl_line_id", "period_month", "amount"])}
+      ON CONFLICT (version_id, company_id, pnl_line_id, period_month)
+      DO UPDATE SET amount = EXCLUDED.amount
+    `;
+  }
 }
