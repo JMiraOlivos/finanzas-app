@@ -50,7 +50,7 @@ export async function loadForecastFile(params: {
     return { success: false, error: `Empresas no encontradas: ${unknownCompanies.join(", ")}` };
   }
 
-  const lineCodes = [...new Set(parsed.rows.map((r) => r.pnlLineCode))];
+  const lineCodes = [...new Set(parsed.rows.map((r) => r.accountName))];
   const pnlLines = await sql<{ id: string; code: string; label: string }[]>`
     SELECT id, code, label FROM finanzas.pnl_lines
     WHERE LOWER(code) = ANY(${lineCodes.map((c) => c.toLowerCase())})
@@ -103,7 +103,7 @@ export async function loadForecastFile(params: {
 
       const values = parsed.rows.map((row) => {
         const companyId  = companyMap.get(row.companyName.toLowerCase())!;
-        const pnlLineId  = lineMap.get(row.pnlLineCode.toLowerCase())!;
+        const pnlLineId  = lineMap.get(row.accountName.toLowerCase())!;
         const year       = parseInt(row.periodMonth.slice(0, 4), 10);
         const versionId  = versionMap.get(`${companyId}:${year}`)!;
         return { version_id: versionId, company_id: companyId, pnl_line_id: pnlLineId, period_month: row.periodMonth, amount: row.amount };
