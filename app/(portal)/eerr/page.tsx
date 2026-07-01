@@ -28,7 +28,6 @@ export default function EerrPage() {
     companyId: string; companyName: string; pnlLineCode: string; pnlLineLabel: string;
   } | null>(null);
 
-  // Load companies on mount
   useEffect(() => {
     fetch("/api/companies")
       .then((r) => r.json() as Promise<Company[]>)
@@ -69,18 +68,19 @@ export default function EerrPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900">Estado de Resultados</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-head text-ev-black">Estado de Resultados</h1>
         <button
           onClick={handleExcel}
           disabled={!payload?.rows.length}
-          className="text-sm px-3 py-1.5 rounded border hover:bg-neutral-50 disabled:opacity-40"
+          className="text-xs font-body px-3 py-1.5 border border-ev-gray6 text-ev-gray2
+                     hover:bg-ev-beige2 disabled:opacity-40 transition-colors"
         >
           Exportar Excel
         </button>
       </div>
 
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="border border-ev-gray7 bg-white overflow-hidden">
         <EerrFilters
           companies={companies}
           selectedCompanyIds={selectedIds}

@@ -41,9 +41,9 @@ export default function EerrLMonthPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-neutral-900">EERR Mes + YTD</h1>
+      <h1 className="text-2xl font-head text-ev-black">EERR Mes + YTD</h1>
 
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="border border-ev-gray7 bg-white overflow-hidden">
         <EerrFilters
           companies={companies}
           selectedCompanyIds={selectedIds}

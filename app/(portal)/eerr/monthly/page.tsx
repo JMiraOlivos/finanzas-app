@@ -35,19 +35,16 @@ export default function EerrMonthlyPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-neutral-900">EERR Mensual</h1>
-      </div>
+      <h1 className="text-2xl font-head text-ev-black">EERR Mensual</h1>
 
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-        {/* Filters */}
-        <div className="border-b px-4 py-3 flex items-center gap-4 bg-neutral-50">
+      <div className="border border-ev-gray7 bg-white overflow-hidden">
+        <div className="border-b border-ev-gray7 px-4 py-3 flex flex-wrap items-center gap-4 bg-ev-beige2">
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-neutral-600">Empresa</label>
+            <label className="text-[10px] font-body uppercase tracking-[0.08em] text-ev-gray2">Empresa</label>
             <select
               value={selectedId}
               onChange={(e) => setSelectedId(e.target.value)}
-              className="text-xs border rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
+              className="text-xs border border-ev-gray6 px-2 py-1 bg-white font-body focus:outline-none focus:ring-1 focus:ring-ev-black"
             >
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -55,11 +52,11 @@ export default function EerrMonthlyPage() {
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-neutral-600">Año</label>
+            <label className="text-[10px] font-body uppercase tracking-[0.08em] text-ev-gray2">Año</label>
             <select
               value={year}
               onChange={(e) => setYear(e.target.value)}
-              className="text-xs border rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-neutral-400"
+              className="text-xs border border-ev-gray6 px-2 py-1 bg-white font-body focus:outline-none focus:ring-1 focus:ring-ev-black"
             >
               {[2023, 2024, 2025, 2026].map((y) => (
                 <option key={y} value={String(y)}>{y}</option>
