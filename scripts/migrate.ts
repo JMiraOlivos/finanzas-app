@@ -45,6 +45,7 @@ const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../sql"
 const MIGRATION_FILES = [
   "007_upload_versioning.sql",
   "008_budget_forecast.sql",
+  "009_formula_components.sql",
 ];
 
 async function run() {

@@ -19,15 +19,15 @@ type KpiMetric = {
   format: string;
 };
 
-const FEATURED_CODES = ["INGRESOS_YTD", "EBITDA_YTD", "EBITDA_MARGIN_YTD", "RESULTADO_FINAL_YTD"];
+const FEATURED_CODES = ["REVENUE_YTD", "EBITDA_YTD", "EBITDA_MARGIN", "RESULTADO_FINAL"];
 
 const VS_PRIOR_MAP: Record<string, string> = {
-  INGRESOS_YTD: "REVENUE_VS_PRIOR_PCT",
-  EBITDA_YTD:   "EBITDA_VS_PRIOR_PCT",
+  REVENUE_YTD: "REVENUE_VS_PRIOR_PCT",
+  EBITDA_YTD:  "EBITDA_VS_PRIOR_PCT",
 };
 const VS_BUDGET_MAP: Record<string, string> = {
-  INGRESOS_YTD: "REVENUE_VS_BUDGET_PCT",
-  EBITDA_YTD:   "EBITDA_VS_BUDGET_PCT",
+  REVENUE_YTD: "REVENUE_VS_BUDGET_PCT",
+  EBITDA_YTD:  "EBITDA_VS_BUDGET_PCT",
 };
 
 function defaultPeriod() {
@@ -110,18 +110,27 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-head text-ev-black">Dashboard Ejecutivo</h1>
           <p className="text-xs font-body uppercase tracking-[0.1em] text-ev-gray3 mt-1">KPIs consolidados</p>
         </div>
-        <input
-          type="month"
-          value={period.slice(0, 7)}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (!v) return;
-            const [y, m] = v.split("-").map(Number);
-            const last = new Date(y, m, 0).getDate();
-            setPeriod(`${v}-${String(last).padStart(2, "0")}`);
-          }}
-          className="border border-ev-gray6 px-3 py-1.5 text-sm font-body focus:outline-none focus:ring-1 focus:ring-ev-black"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="month"
+            value={period.slice(0, 7)}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return;
+              const [y, m] = v.split("-").map(Number);
+              const last = new Date(y, m, 0).getDate();
+              setPeriod(`${v}-${String(last).padStart(2, "0")}`);
+            }}
+            className="border border-ev-gray6 px-3 py-1.5 text-sm font-body focus:outline-none focus:ring-1 focus:ring-ev-black"
+          />
+          <a
+            href={`/api/export/board-pack?period=${period}`}
+            download
+            className="border border-ev-gray6 px-3 py-1.5 text-sm font-body text-ev-gray3 hover:text-ev-black hover:border-ev-black transition-colors"
+          >
+            PDF ↓
+          </a>
+        </div>
       </div>
 
       {error && (
