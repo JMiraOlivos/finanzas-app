@@ -22,29 +22,41 @@ export async function GET(request: NextRequest) {
 
   const alerts: AlertItem[] = [];
 
-  // 1. Companies with no upload this period
+  // 1. Companies with no data in the mart for the current display period.
+  // Using fct_dashboard_kpis instead of uploaded_files so the check is
+  // consistent with what the dashboard actually shows (avoids false positives
+  // when upload period_month differs from the mart's period_month).
   const noUploadRows = allowedIds === null
     ? await sql`
+        WITH latest AS (
+          SELECT MAX(period_month) AS pm
+          FROM finanzas.fct_dashboard_kpis
+          WHERE period_month <= date_trunc('month', ${period}::date)::date
+        )
         SELECT c.name
-        FROM finanzas.companies c
+        FROM finanzas.companies c, latest
         WHERE c.is_active = TRUE
           AND NOT EXISTS (
-            SELECT 1 FROM finanzas.uploaded_files uf
-            WHERE uf.company_id = c.id
-              AND uf.period_month = date_trunc('month', ${period}::date)
-              AND uf.status = 'processed'
+            SELECT 1 FROM finanzas.fct_dashboard_kpis k
+            WHERE k.company_id = c.id
+              AND k.period_month = latest.pm
           )
         ORDER BY c.name`
     : await sql`
+        WITH latest AS (
+          SELECT MAX(period_month) AS pm
+          FROM finanzas.fct_dashboard_kpis
+          WHERE period_month <= date_trunc('month', ${period}::date)::date
+            AND company_id = ANY(${allowedIds}::uuid[])
+        )
         SELECT c.name
-        FROM finanzas.companies c
+        FROM finanzas.companies c, latest
         WHERE c.is_active = TRUE
           AND c.id = ANY(${allowedIds}::uuid[])
           AND NOT EXISTS (
-            SELECT 1 FROM finanzas.uploaded_files uf
-            WHERE uf.company_id = c.id
-              AND uf.period_month = date_trunc('month', ${period}::date)
-              AND uf.status = 'processed'
+            SELECT 1 FROM finanzas.fct_dashboard_kpis k
+            WHERE k.company_id = c.id
+              AND k.period_month = latest.pm
           )
         ORDER BY c.name`;
 
