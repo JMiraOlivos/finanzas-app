@@ -201,21 +201,48 @@ export async function GET(request: NextRequest) {
 
   const allowedIds = await getAllowedCompanyIds(user.id, user.role);
 
+  const n = (v: unknown) => (v !== null && v !== undefined ? Number(v) : null);
+  const pct = (a: number | null, b: number | null) =>
+    a !== null && b ? (a - b) / Math.abs(b) : null;
+
   // Fetch all data in parallel
-  const [kpiRows, rankCurr, rankPrior, alertRows, pnlRows] = await Promise.all([
+  const [kpiAndRankRows, alertRows, pnlRows] = await Promise.all([
+    // KPIs + ranking from fct_dashboard_kpis (replaces fn_dashboard_kpis + fn_pnl_ytd x2)
     allowedIds === null
-      ? sql`SELECT * FROM finanzas.fn_dashboard_kpis(${period}::date, NULL)`
-      : sql`SELECT * FROM finanzas.fn_dashboard_kpis(${period}::date, ${allowedIds}::uuid[])`,
+      ? sql`
+          WITH latest AS (
+            SELECT MAX(period_month) AS pm
+            FROM finanzas.fct_dashboard_kpis
+            WHERE period_month <= date_trunc('month', ${period}::date)::date
+          )
+          SELECT company_id, company_name,
+                 revenue_ytd, ebitda_ytd, resultado_ytd, rrhh_ytd, mkt_ytd,
+                 revenue_ytd_prior, ebitda_ytd_prior,
+                 revenue_ytd_budget, ebitda_ytd_budget
+          FROM finanzas.fct_dashboard_kpis
+          CROSS JOIN latest
+          WHERE period_month = latest.pm
+          ORDER BY revenue_ytd DESC NULLS LAST
+        `
+      : sql`
+          WITH latest AS (
+            SELECT MAX(period_month) AS pm
+            FROM finanzas.fct_dashboard_kpis
+            WHERE period_month <= date_trunc('month', ${period}::date)::date
+              AND company_id = ANY(${allowedIds}::uuid[])
+          )
+          SELECT company_id, company_name,
+                 revenue_ytd, ebitda_ytd, resultado_ytd, rrhh_ytd, mkt_ytd,
+                 revenue_ytd_prior, ebitda_ytd_prior,
+                 revenue_ytd_budget, ebitda_ytd_budget
+          FROM finanzas.fct_dashboard_kpis
+          CROSS JOIN latest
+          WHERE period_month = latest.pm
+            AND company_id = ANY(${allowedIds}::uuid[])
+          ORDER BY revenue_ytd DESC NULLS LAST
+        `,
 
-    allowedIds === null
-      ? sql`SELECT * FROM finanzas.fn_pnl_ytd(${period}::date, NULL)`
-      : sql`SELECT * FROM finanzas.fn_pnl_ytd(${period}::date, ${allowedIds}::uuid[])`,
-
-    allowedIds === null
-      ? sql`SELECT * FROM finanzas.fn_pnl_ytd((${period}::date - INTERVAL '1 year')::date, NULL)`
-      : sql`SELECT * FROM finanzas.fn_pnl_ytd((${period}::date - INTERVAL '1 year')::date, ${allowedIds}::uuid[])`,
-
-    // Alerts: no upload this period
+    // Alerts: no upload this period (unchanged)
     allowedIds === null
       ? sql`
           SELECT c.name, NOT EXISTS (
@@ -236,41 +263,54 @@ export async function GET(request: NextRequest) {
           WHERE c.is_active = TRUE AND c.id = ANY(${allowedIds}::uuid[])
           ORDER BY c.name`,
 
+    // P&L table: keep fn_pnl_ytd — TODO(eerr-migration): migrar a fct_pnl_monthly cuando se valide column mapping
     allowedIds === null
       ? sql`SELECT line_code, line_label, line_type, is_bold, SUM(amount) AS amount FROM finanzas.fn_pnl_ytd(${period}::date, NULL) GROUP BY line_code, line_label, line_type, is_bold, sort_order ORDER BY sort_order`
       : sql`SELECT line_code, line_label, line_type, is_bold, SUM(amount) AS amount FROM finanzas.fn_pnl_ytd(${period}::date, ${allowedIds}::uuid[]) GROUP BY line_code, line_label, line_type, is_bold, sort_order ORDER BY sort_order`,
   ]);
 
-  // Build KPI map
-  const kpis: KpiMap = {};
-  for (const r of kpiRows) {
-    kpis[r.metric_code as string] = r.metric_value !== null ? Number(r.metric_value) : null;
+  // Build consolidated KPIs by summing across all companies
+  let revSum = 0, ebitdaSum = 0, resSum = 0, rrhhSum = 0, mktSum = 0;
+  let revPriorSum = 0, ebitPriorSum = 0, revBudSum = 0, ebitBudSum = 0;
+  for (const r of kpiAndRankRows) {
+    revSum       += n(r.revenue_ytd)        ?? 0;
+    ebitdaSum    += n(r.ebitda_ytd)         ?? 0;
+    resSum       += n(r.resultado_ytd)      ?? 0;
+    rrhhSum      += n(r.rrhh_ytd)           ?? 0;
+    mktSum       += n(r.mkt_ytd)            ?? 0;
+    revPriorSum  += n(r.revenue_ytd_prior)  ?? 0;
+    ebitPriorSum += n(r.ebitda_ytd_prior)   ?? 0;
+    revBudSum    += n(r.revenue_ytd_budget) ?? 0;
+    ebitBudSum   += n(r.ebitda_ytd_budget)  ?? 0;
   }
 
-  // Build ranking by company
-  type RowByCompany = Record<string, { name: string; revenue: number | null; ebitda: number | null; ebitdaMargin: number | null; revenueVsPrior: number | null }>;
-  const curr:  Record<string, { name: string; revenue: number | null; ebitda: number | null }> = {};
-  const prior: Record<string, { revenue: number | null }> = {};
+  const kpis: KpiMap = {
+    REVENUE_YTD:           revSum,
+    EBITDA_YTD:            ebitdaSum,
+    EBITDA_MARGIN:         revSum !== 0 ? ebitdaSum / revSum : null,
+    RESULTADO_FINAL:       resSum,
+    RRHH_RATIO:            revSum !== 0 ? rrhhSum / revSum : null,
+    MKT_RATIO:             revSum !== 0 ? mktSum / revSum : null,
+    REVENUE_VS_PRIOR_PCT:  pct(revSum, revPriorSum),
+    EBITDA_VS_PRIOR_PCT:   pct(ebitdaSum, ebitPriorSum),
+    REVENUE_VS_BUDGET_PCT: pct(revSum, revBudSum),
+    EBITDA_VS_BUDGET_PCT:  pct(ebitdaSum, ebitBudSum),
+    EBITDA_BUDGET_ATTAIN:  ebitBudSum !== 0 ? ebitdaSum / ebitBudSum : null,
+  };
 
-  for (const r of rankCurr) {
-    const cid = r.company_id as string;
-    if (!curr[cid]) curr[cid] = { name: r.company_name as string, revenue: null, ebitda: null };
-    if (r.line_code === "INGRESOS") curr[cid].revenue = Number(r.amount);
-    if (r.line_code === "EBITDA")   curr[cid].ebitda  = Number(r.amount);
-  }
-  for (const r of rankPrior) {
-    const cid = r.company_id as string;
-    if (!prior[cid]) prior[cid] = { revenue: null };
-    if (r.line_code === "INGRESOS") prior[cid].revenue = Number(r.amount);
-  }
-
-  const ranking: RankingRow[] = Object.entries(curr).map(([cid, c]) => {
-    const p = prior[cid];
-    const margin = c.revenue && c.revenue !== 0 && c.ebitda != null ? c.ebitda / c.revenue : null;
-    const priorRev = p?.revenue ?? null;
-    const vsPrior = priorRev && priorRev !== 0 && c.revenue != null ? (c.revenue - priorRev) / Math.abs(priorRev) : null;
-    return { companyName: c.name, revenue: c.revenue, ebitda: c.ebitda, ebitdaMargin: margin, revenueVsPriorPct: vsPrior };
-  }).sort((a, b) => (b.revenue ?? -Infinity) - (a.revenue ?? -Infinity));
+  // Build per-company ranking
+  const ranking: RankingRow[] = kpiAndRankRows.map((r) => {
+    const revenue  = n(r.revenue_ytd);
+    const ebitda   = n(r.ebitda_ytd);
+    const revPrior = n(r.revenue_ytd_prior);
+    return {
+      companyName:        r.company_name as string,
+      revenue,
+      ebitda,
+      ebitdaMargin:       revenue && revenue !== 0 && ebitda !== null ? ebitda / revenue : null,
+      revenueVsPriorPct:  pct(revenue, revPrior),
+    };
+  });
 
   // Build alerts
   const alerts: AlertItem[] = [];

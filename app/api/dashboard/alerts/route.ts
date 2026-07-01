@@ -86,15 +86,15 @@ export async function GET(request: NextRequest) {
   // 3. Unmapped accounts with significant amount
   const unmappedRows = allowedIds === null
     ? await sql`
-        SELECT COUNT(DISTINCT account_code)::int AS cnt,
-               COALESCE(SUM(ABS(amount)), 0) AS total
-        FROM finanzas.v_unmapped_pnl_accounts
-        WHERE period_month = date_trunc('month', ${period}::date)`
+        SELECT COALESCE(SUM(unmapped_account_count), 0)::int AS cnt,
+               COALESCE(SUM(unmapped_amount), 0)             AS total
+        FROM finanzas.dq_financial_control
+        WHERE period_month = date_trunc('month', ${period}::date)::date`
     : await sql`
-        SELECT COUNT(DISTINCT account_code)::int AS cnt,
-               COALESCE(SUM(ABS(amount)), 0) AS total
-        FROM finanzas.v_unmapped_pnl_accounts
-        WHERE period_month = date_trunc('month', ${period}::date)
+        SELECT COALESCE(SUM(unmapped_account_count), 0)::int AS cnt,
+               COALESCE(SUM(unmapped_amount), 0)             AS total
+        FROM finanzas.dq_financial_control
+        WHERE period_month = date_trunc('month', ${period}::date)::date
           AND company_id = ANY(${allowedIds}::uuid[])`;
 
   const unmapped = unmappedRows[0];

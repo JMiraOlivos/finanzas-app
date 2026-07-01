@@ -2,6 +2,14 @@ import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+function formatRelativeTime(date: Date): string {
+  const diffMin = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
+  if (diffMin < 1) return "menos de 1 min";
+  if (diffMin < 60) return `${diffMin} min`;
+  const h = Math.floor(diffMin / 60);
+  return `${h}h ${diffMin % 60}min`;
+}
+
 function trafficLight(diff: number, unmappedAccounts: number, status: string): "green" | "yellow" | "red" {
   if (status === "failed") return "red";
   if (diff > 1000 || status === "processing") return "red";
@@ -35,7 +43,8 @@ function fmt(n: number | null): string {
 }
 
 export default async function ControlPage() {
-  const rows = await sql`
+  const [rows, dbtStatus] = await Promise.all([
+    sql`
     SELECT
       c.id                                                       AS company_id,
       c.name                                                     AS company_name,
@@ -73,7 +82,14 @@ export default async function ControlPage() {
     WHERE c.is_active = TRUE
     GROUP BY c.id, c.name, uf.id, au.full_name
     ORDER BY c.name, uf.period_month DESC NULLS LAST
-  `;
+  `,
+    sql`
+      SELECT triggered_at, status
+      FROM finanzas.dbt_run_history
+      ORDER BY triggered_at DESC
+      LIMIT 1
+    `,
+  ]);
 
   return (
     <div className="space-y-6">
@@ -82,6 +98,13 @@ export default async function ControlPage() {
         <p className="text-sm text-neutral-500 mt-1">
           Estado de cargas por empresa y período. Revisar antes de publicar información a directorio.
         </p>
+        {dbtStatus[0] && (
+          <p className="text-xs text-neutral-400 mt-1">
+            Marts actualizados: hace {formatRelativeTime(dbtStatus[0].triggered_at as Date)}
+            {" "}·{" "}
+            {(dbtStatus[0].status as string) === "triggered" ? "en progreso" : dbtStatus[0].status as string}
+          </p>
+        )}
       </div>
 
       <div className="rounded-xl border bg-white shadow-sm overflow-hidden">

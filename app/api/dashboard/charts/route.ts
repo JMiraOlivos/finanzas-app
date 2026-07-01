@@ -19,6 +19,12 @@ const EXPENSE_CODES = [
   { code: "TECNOLOGIA",       label: "Tecnología" },
 ];
 
+// All EBITDA component codes per pnl_formula_components (formula_key = 'EBITDA')
+const EBITDA_CODES = new Set([
+  "INGRESOS", "GASTOS_VARIABLES", "RRHH", "MARKETING",
+  "GASTOS_ADMIN", "ASESORIAS", "GASTOS_OFICINA", "TECNOLOGIA", "NO_OPERACIONALES",
+]);
+
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,28 +38,62 @@ export async function GET(request: NextRequest) {
   const allowedIds = await getAllowedCompanyIds(user.id, user.role);
 
   const [monthlyData, ytdData] = await Promise.all([
+    // Monthly trend: fetch all EBITDA component codes from fct_pnl_monthly
+    // EBITDA is computed in TypeScript by summing EBITDA_CODES (see below)
     allowedIds === null
-      ? sql`SELECT line_code,
-                   EXTRACT(MONTH FROM period_month)::int AS month_num,
-                   SUM(amount) AS amount
-            FROM (SELECT * FROM finanzas.fn_pnl_monthly(${year}, NULL)) AS sub
-            WHERE line_code IN ('INGRESOS','EBITDA')
-            GROUP BY line_code, month_num`
-      : sql`SELECT line_code,
-                   EXTRACT(MONTH FROM period_month)::int AS month_num,
-                   SUM(amount) AS amount
-            FROM (SELECT * FROM finanzas.fn_pnl_monthly(${year}, ${allowedIds}::uuid[])) AS sub
-            WHERE line_code IN ('INGRESOS','EBITDA')
-            GROUP BY line_code, month_num`,
+      ? sql`
+          SELECT pnl_line_code AS line_code,
+                 EXTRACT(MONTH FROM period_month)::int AS month_num,
+                 SUM(amount) AS amount
+          FROM finanzas.fct_pnl_monthly
+          WHERE EXTRACT(YEAR FROM period_month) = ${year}
+            AND pnl_line_code IN (
+              'INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
+              'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA','NO_OPERACIONALES'
+            )
+          GROUP BY pnl_line_code, month_num`
+      : sql`
+          SELECT pnl_line_code AS line_code,
+                 EXTRACT(MONTH FROM period_month)::int AS month_num,
+                 SUM(amount) AS amount
+          FROM finanzas.fct_pnl_monthly
+          WHERE EXTRACT(YEAR FROM period_month) = ${year}
+            AND company_id = ANY(${allowedIds}::uuid[])
+            AND pnl_line_code IN (
+              'INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
+              'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA','NO_OPERACIONALES'
+            )
+          GROUP BY pnl_line_code, month_num`,
+
+    // YTD breakdown and company comparison
     allowedIds === null
-      ? sql`SELECT company_id, company_name, line_code, amount
-            FROM finanzas.fn_pnl_ytd(${period}::date, NULL)
-            WHERE line_code IN ('INGRESOS','RRHH','GASTOS_VARIABLES','MARKETING',
-                                'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA')`
-      : sql`SELECT company_id, company_name, line_code, amount
-            FROM finanzas.fn_pnl_ytd(${period}::date, ${allowedIds}::uuid[])
-            WHERE line_code IN ('INGRESOS','RRHH','GASTOS_VARIABLES','MARKETING',
-                                'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA')`,
+      ? sql`
+          SELECT f.company_id, c.name AS company_name,
+                 f.pnl_line_code AS line_code,
+                 SUM(f.amount) AS amount
+          FROM finanzas.fct_pnl_monthly f
+          JOIN finanzas.companies c ON c.id = f.company_id
+          WHERE f.period_month >= date_trunc('year', ${period}::date)::date
+            AND f.period_month <= date_trunc('month', ${period}::date)::date
+            AND f.pnl_line_code IN (
+              'INGRESOS','RRHH','GASTOS_VARIABLES','MARKETING',
+              'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA'
+            )
+          GROUP BY f.company_id, c.name, f.pnl_line_code`
+      : sql`
+          SELECT f.company_id, c.name AS company_name,
+                 f.pnl_line_code AS line_code,
+                 SUM(f.amount) AS amount
+          FROM finanzas.fct_pnl_monthly f
+          JOIN finanzas.companies c ON c.id = f.company_id
+          WHERE f.period_month >= date_trunc('year', ${period}::date)::date
+            AND f.period_month <= date_trunc('month', ${period}::date)::date
+            AND f.company_id = ANY(${allowedIds}::uuid[])
+            AND f.pnl_line_code IN (
+              'INGRESOS','RRHH','GASTOS_VARIABLES','MARKETING',
+              'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA'
+            )
+          GROUP BY f.company_id, c.name, f.pnl_line_code`,
   ]);
 
   // Monthly trend: sum across companies per month
@@ -67,7 +107,7 @@ export async function GET(request: NextRequest) {
     const entry = byMonth.get(month);
     if (!entry) continue;
     if (row.line_code === "INGRESOS") entry.revenue += amount;
-    else if (row.line_code === "EBITDA") entry.ebitda += amount;
+    if (EBITDA_CODES.has(row.line_code as string)) entry.ebitda += amount;
   }
   const months = Array.from(byMonth.keys()).sort();
   const monthly = {

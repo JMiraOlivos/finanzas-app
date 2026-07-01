@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
           SELECT MAX(period_month) AS pm
           FROM finanzas.fct_dashboard_kpis
           WHERE period_month <= date_trunc('month', ${period}::date)::date
+            AND company_id = ANY(${allowedIds}::uuid[])
         )
         SELECT
           SUM(revenue_ytd)        AS revenue_ytd,
