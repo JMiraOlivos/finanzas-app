@@ -5,6 +5,7 @@ import { FinancialStatementTable } from "@/components/financial/FinancialStateme
 import { DrillDownDrawer } from "@/components/financial/DrillDownDrawer";
 import { EerrFilters } from "@/components/financial/EerrFilters";
 import { FinancialStatementPayload, FinancialRow } from "@/lib/eerr";
+import { type EerrMode } from "@/components/financial/EerrFilters";
 
 type Company = { id: string; name: string };
 
@@ -19,7 +20,7 @@ export default function EerrPage() {
   const [companies,    setCompanies]    = useState<Company[]>([]);
   const [selectedIds,  setSelectedIds]  = useState<string[]>([]);
   const [period,       setPeriod]       = useState(defaultPeriod);
-  const [mode,         setMode]         = useState<"ytd" | "lmonth">("ytd");
+  const [mode,         setMode]         = useState<EerrMode>("ytd");
   const [payload,      setPayload]      = useState<FinancialStatementPayload | null>(null);
   const [loading,      setLoading]      = useState(false);
 
@@ -110,7 +111,7 @@ export default function EerrPage() {
           period={period}
           pnlLineCode={drawerParams.pnlLineCode}
           pnlLineLabel={drawerParams.pnlLineLabel}
-          viewMode={mode === "lmonth" ? "ytd" : mode}
+          viewMode={mode === "lmonth" || mode === "vs_budget" ? "ytd" : mode}
         />
       )}
     </div>

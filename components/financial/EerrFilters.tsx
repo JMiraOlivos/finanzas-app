@@ -2,14 +2,16 @@
 
 type Company = { id: string; name: string };
 
+export type EerrMode = "ytd" | "lmonth" | "vs_budget";
+
 type Props = {
   companies: Company[];
   selectedCompanyIds: string[];
   onCompanyChange: (ids: string[]) => void;
   period: string;           // "YYYY-MM-DD"
   onPeriodChange: (p: string) => void;
-  mode?: "ytd" | "lmonth";
-  onModeChange?: (m: "ytd" | "lmonth") => void;
+  mode?: EerrMode;
+  onModeChange?: (m: EerrMode) => void;
 };
 
 export function EerrFilters({
@@ -18,7 +20,7 @@ export function EerrFilters({
   onCompanyChange,
   period,
   onPeriodChange,
-  mode,
+  mode = "ytd",
   onModeChange,
 }: Props) {
   function toggleCompany(id: string) {
@@ -65,18 +67,19 @@ export function EerrFilters({
       {/* Mode toggle */}
       {onModeChange && (
         <div className="flex border border-ev-gray6 overflow-hidden text-xs">
-          <button
-            onClick={() => onModeChange("ytd")}
-            className={["px-3 py-1 font-body font-medium", mode === "ytd" ? "bg-ev-black text-white" : "bg-white text-ev-gray2 hover:bg-ev-beige2"].join(" ")}
-          >
-            YTD
-          </button>
-          <button
-            onClick={() => onModeChange("lmonth")}
-            className={["px-3 py-1 font-body font-medium border-l border-ev-gray6", mode === "lmonth" ? "bg-ev-black text-white" : "bg-white text-ev-gray2 hover:bg-ev-beige2"].join(" ")}
-          >
-            Mes + YTD
-          </button>
+          {(["ytd", "lmonth", "vs_budget"] as EerrMode[]).map((m, i) => (
+            <button
+              key={m}
+              onClick={() => onModeChange(m)}
+              className={[
+                "px-3 py-1 font-body font-medium",
+                i > 0 ? "border-l border-ev-gray6" : "",
+                mode === m ? "bg-ev-black text-white" : "bg-white text-ev-gray2 hover:bg-ev-beige2",
+              ].join(" ")}
+            >
+              {m === "ytd" ? "YTD" : m === "lmonth" ? "Mes + YTD" : "vs Ppto."}
+            </button>
+          ))}
         </div>
       )}
 

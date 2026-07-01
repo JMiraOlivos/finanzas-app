@@ -23,9 +23,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <span className="mx-1 text-neutral-300">|</span>
             <Link href="/admin/upload"   className="px-2.5 py-1 rounded text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100">Cargar</Link>
             <Link href="/admin/budget"   className="px-2.5 py-1 rounded text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100">Presupuesto</Link>
+            <Link href="/admin/forecast" className="px-2.5 py-1 rounded text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100">Forecast</Link>
             <Link href="/admin/mappings" className="px-2.5 py-1 rounded text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100">Mappings</Link>
             <Link href="/admin/files"    className="px-2.5 py-1 rounded text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100">Archivos</Link>
             <Link href="/admin/control"  className="px-2.5 py-1 rounded text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100">Control</Link>
+            <Link href="/admin/users"    className="px-2.5 py-1 rounded text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100">Usuarios</Link>
+            <Link href="/admin/audit"    className="px-2.5 py-1 rounded text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100">Auditoría</Link>
           </nav>
           <div className="flex items-center gap-3 ml-auto">
             <span className="text-xs text-neutral-500 hidden sm:block">{user.name ?? user.email}</span>
