@@ -3,6 +3,8 @@ SET search_path TO finanzas;
 -- ─── v_pnl_movements ─────────────────────────────────────────────────────────
 -- Every journal entry that is P&L, joined to its PnL line (if mapped).
 
+-- LATERAL subquery picks the best mapping per journal entry:
+-- company-specific (company_id = je.company_id) beats global (company_id IS NULL).
 CREATE OR REPLACE VIEW v_pnl_movements AS
 SELECT
   je.id                                         AS journal_entry_id,
@@ -18,9 +20,9 @@ SELECT
   je.cost_center,
   je.debit,
   je.credit,
-  je.amount * COALESCE(apm.sign_multiplier, 1)  AS pnl_amount,
+  je.amount * COALESCE(best.sign_multiplier, 1) AS pnl_amount,
   je.currency,
-  apm.pnl_line_id,
+  best.pnl_line_id,
   pl.code                                       AS pnl_line_code,
   pl.label                                      AS pnl_line_label,
   pl.parent_code,
@@ -29,12 +31,17 @@ SELECT
 FROM journal_entries je
 JOIN companies c
   ON c.id = je.company_id
-LEFT JOIN account_pnl_mappings apm
-  ON apm.is_active = TRUE
-  AND apm.account_code = je.account_code
-  AND (apm.company_id = je.company_id OR apm.company_id IS NULL)
+LEFT JOIN LATERAL (
+  SELECT apm.pnl_line_id, apm.sign_multiplier
+  FROM account_pnl_mappings apm
+  WHERE apm.is_active = TRUE
+    AND apm.account_code = je.account_code
+    AND (apm.company_id = je.company_id OR apm.company_id IS NULL)
+  ORDER BY CASE WHEN apm.company_id IS NOT NULL THEN 1 ELSE 2 END
+  LIMIT 1
+) best ON TRUE
 LEFT JOIN pnl_lines pl
-  ON pl.id = apm.pnl_line_id
+  ON pl.id = best.pnl_line_id
 WHERE je.is_pnl = TRUE;
 
 -- ─── v_unmapped_pnl_accounts ─────────────────────────────────────────────────

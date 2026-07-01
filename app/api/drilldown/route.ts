@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { assertCanViewCompany, canViewMovements } from "@/lib/permissions";
+import { logAudit } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -49,6 +50,13 @@ export async function GET(request: NextRequest) {
     a.amount += Number(r.pnl_amount);
     a.movementCount += 1;
   }
+
+  await logAudit({
+    userId: user.id,
+    action: "view_drilldown",
+    entityType: "pnl_line",
+    metadata: { company_id: companyId, period, pnl_line_code: pnlLineCode, view_mode: viewMode },
+  });
 
   return NextResponse.json({
     accounts: Array.from(accountMap.values()).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)),

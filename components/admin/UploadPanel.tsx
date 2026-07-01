@@ -15,6 +15,8 @@ type UploadResult = {
   totalCredit: number;
   pnlRowCount: number;
   unmappedAccounts: { accountCode: string; accountName: string | null; movementCount: number; totalAmount: number }[];
+  warnings: string[];
+  supersededCount: number;
 };
 
 type Props = {
@@ -149,6 +151,21 @@ export function UploadPanel({ companies }: Props) {
               <span className="font-medium tabular-nums">{formatCurrency(result.totalCredit)}</span>
             </div>
           </div>
+
+          {result.supersededCount > 0 && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm text-blue-800">
+              Carga anterior reemplazada: los movimientos del período previo fueron eliminados y reemplazados por los de este archivo.
+            </div>
+          )}
+
+          {result.warnings.length > 0 && (
+            <div className="rounded-xl border border-orange-200 bg-orange-50 px-5 py-3 space-y-1">
+              <p className="text-sm font-medium text-orange-800">Advertencias</p>
+              {result.warnings.map((w, i) => (
+                <p key={i} className="text-sm text-orange-700">{w}</p>
+              ))}
+            </div>
+          )}
 
           {result.unmappedAccounts.length > 0 && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">

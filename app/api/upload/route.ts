@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
     filename: file.name,
     companyId,
     periodMonth: period ?? undefined,
+    uploadedBy: user.id,
   });
 
   if (!result.success) {
