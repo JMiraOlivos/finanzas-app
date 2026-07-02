@@ -8,6 +8,9 @@ on:
   repository_dispatch:
     types: [dbt-run]
   workflow_dispatch:
+  schedule:
+    # First day of each month at 04:00 UTC (00:00 Chile summer / 01:00 Chile winter)
+    - cron: "0 4 1 * *"
 
 jobs:
   dbt-run:
