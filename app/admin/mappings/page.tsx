@@ -11,6 +11,15 @@ export default async function MappingsPage() {
 
   return (
     <div className="space-y-6">
+      <div className="border border-amber-400 bg-amber-50 px-4 py-3">
+        <p className="text-sm font-body text-amber-800 font-semibold">Página de mappings legado</p>
+        <p className="text-xs font-body text-amber-700 mt-1">
+          Los cambios realizados aquí ya no afectan los reportes. Los mappings activos se gestionan
+          en <a href="/admin/pnl-builder" className="underline font-semibold">P&amp;L Builder → Mappings</a> dentro de una versión publicada.
+          Esta página permanece solo como referencia histórica.
+        </p>
+      </div>
+
       <div>
         <h1 className="text-xl font-semibold text-neutral-900">Mapeo de cuentas PnL</h1>
         <p className="text-sm text-neutral-500 mt-1">
