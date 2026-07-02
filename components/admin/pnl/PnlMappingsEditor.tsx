@@ -44,17 +44,16 @@ type Props = { version: Version };
 type Tab = "unmapped" | "existing";
 
 export function PnlMappingsEditor({ version }: Props) {
-  const [tab,       setTab]       = useState<Tab>("unmapped");
-  const [unmapped,  setUnmapped]  = useState<UnmappedAccount[]>([]);
-  const [mappings,  setMappings]  = useState<ExistingMapping[]>([]);
-  const [lines,     setLines]     = useState<PnlLine[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [selections, setSelections] = useState<Record<string, string>>({});
-  const [saving,    setSaving]    = useState<Record<string, boolean>>({});
-  const [saved,     setSaved]     = useState<Record<string, boolean>>({});
-  const [errors,    setErrors]    = useState<Record<string, string>>({});
-  const [deleting,  setDeleting]  = useState<string | null>(null);
-  const [globalError, setGlobalError] = useState<string | null>(null);
+  const [tab,          setTab]          = useState<Tab>("unmapped");
+  const [unmapped,     setUnmapped]     = useState<UnmappedAccount[]>([]);
+  const [mappings,     setMappings]     = useState<ExistingMapping[]>([]);
+  const [lines,        setLines]        = useState<PnlLine[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [selections,   setSelections]   = useState<Record<string, string>>({});
+  const [bulkSaving,   setBulkSaving]   = useState(false);
+  const [bulkResult,   setBulkResult]   = useState<number | null>(null);
+  const [deleting,     setDeleting]     = useState<string | null>(null);
+  const [globalError,  setGlobalError]  = useState<string | null>(null);
 
   const isDraft = version.status === "draft";
 
@@ -77,8 +76,8 @@ export function PnlMappingsEditor({ version }: Props) {
     setUnmapped(u);
     setMappings(m);
     setLines(l);
-    setSaved({});
     setSelections({});
+    setBulkResult(null);
     setLoading(false);
   }, [version.id]);
 
@@ -88,32 +87,40 @@ export function PnlMappingsEditor({ version }: Props) {
 
   function uKey(a: UnmappedAccount) { return `${a.companyId}|${a.accountCode}`; }
 
-  async function saveOne(account: UnmappedAccount) {
-    const k = uKey(account);
-    const pnlLineCode = selections[k];
-    if (!pnlLineCode) return;
-    setSaving((p) => ({ ...p, [k]: true }));
-    setErrors((p) => ({ ...p, [k]: "" }));
+  const selectionCount = Object.values(selections).filter(Boolean).length;
 
-    const res = await fetch(`/api/admin/pnl/versions/${version.id}/mappings`, {
-      method: "POST",
+  async function saveBulk() {
+    const items = unmapped
+      .filter((a) => selections[uKey(a)])
+      .map((a) => ({
+        companyId:   a.companyId,
+        accountCode: a.accountCode,
+        accountName: a.accountName,
+        pnlLineCode: selections[uKey(a)],
+      }));
+
+    if (items.length === 0) return;
+
+    setBulkSaving(true);
+    setGlobalError(null);
+
+    const res = await fetch(`/api/admin/pnl/versions/${version.id}/mappings/bulk`, {
+      method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        companyId:   account.companyId,
-        accountCode: account.accountCode,
-        accountName: account.accountName,
-        pnlLineCode,
-      }),
+      body:    JSON.stringify(items),
     });
+
     if (!res.ok) {
       const d = await res.json() as { error?: string };
-      setErrors((p) => ({ ...p, [k]: d.error ?? "Error al guardar" }));
+      setGlobalError(d.error ?? "Error al guardar mappings");
+      setBulkSaving(false);
     } else {
-      setSaved((p) => ({ ...p, [k]: true }));
-      // Reload mappings count but keep unmapped list visual until full reload
-      setTimeout(() => void load(), 800);
+      const d = await res.json() as { inserted: number };
+      setBulkResult(d.inserted);
+      setBulkSaving(false);
+      // Reload to reflect saved accounts in both tabs
+      await load();
     }
-    setSaving((p) => ({ ...p, [k]: false }));
   }
 
   async function deleteMapping(mappingId: string) {
@@ -167,95 +174,108 @@ export function PnlMappingsEditor({ version }: Props) {
 
       {/* Tab: Sin mapear */}
       {tab === "unmapped" && (
-        <div className="border border-ev-gray7 bg-white overflow-hidden">
-          <table className="min-w-full text-sm border-collapse">
-            <thead className="bg-ev-beige2">
-              <tr>
-                {["Empresa", "Cuenta", "Monto", "Mov.", "Línea P&L", isDraft ? "" : undefined]
-                  .filter(Boolean)
-                  .map((h) => (
+        <div className="space-y-2">
+          {/* Bulk save toolbar */}
+          {isDraft && !loading && unmapped.length > 0 && (
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-body text-ev-gray3">
+                {selectionCount > 0
+                  ? `${selectionCount} de ${unmapped.length} cuentas seleccionadas`
+                  : `${unmapped.length} cuenta${unmapped.length !== 1 ? "s" : ""} sin mapear — usa los dropdowns y luego guarda`}
+              </p>
+              <div className="flex items-center gap-3">
+                {bulkResult !== null && (
+                  <span className="text-xs font-body text-ev-green">✓ {bulkResult} guardados</span>
+                )}
+                <button
+                  onClick={saveBulk}
+                  disabled={selectionCount === 0 || bulkSaving}
+                  className="px-4 py-1.5 text-xs font-body bg-ev-black text-white hover:bg-ev-gray2 disabled:opacity-40 transition-colors"
+                >
+                  {bulkSaving ? "Guardando..." : `Guardar seleccionados (${selectionCount})`}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="border border-ev-gray7 bg-white overflow-hidden">
+            <table className="min-w-full text-sm border-collapse">
+              <thead className="bg-ev-beige2">
+                <tr>
+                  {["Empresa", "Cuenta", "Monto", "Mov.", "Línea P&L"].map((h) => (
                     <th key={h} className="px-3 py-2.5 text-left text-[10px] font-body uppercase tracking-[0.1em] text-ev-gray3 whitespace-nowrap">
                       {h}
                     </th>
                   ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading && Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="border-t border-ev-gray7">
-                  <td colSpan={6} className="px-3 py-3">
-                    <div className="h-3.5 bg-neutral-100 animate-pulse rounded" />
-                  </td>
                 </tr>
-              ))}
-              {!loading && unmapped.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm font-body text-ev-gray3">
-                    Todas las cuentas P&L están mapeadas en esta versión.
-                  </td>
-                </tr>
-              )}
-              {!loading && unmapped.map((a) => {
-                const k = uKey(a);
-                const isSaved = saved[k];
-                return (
-                  <tr key={k} className={["border-t border-ev-gray7", isSaved ? "bg-green-50" : "hover:bg-ev-beige2"].join(" ")}>
-                    <td className="px-3 py-2.5 text-xs font-body text-ev-gray3 whitespace-nowrap">{a.companyName}</td>
-                    <td className="px-3 py-2.5">
-                      <span className="font-mono text-xs text-ev-black">{a.accountCode}</span>
-                      {a.accountName && <span className="ml-2 text-[11px] font-body text-ev-gray4">{a.accountName}</span>}
+              </thead>
+              <tbody>
+                {loading && Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-t border-ev-gray7">
+                    <td colSpan={5} className="px-3 py-3">
+                      <div className="h-3.5 bg-neutral-100 animate-pulse rounded" />
                     </td>
-                    <td className="px-3 py-2.5 text-xs font-body tabular-nums text-right whitespace-nowrap text-ev-gray2">
-                      {formatCurrency(a.totalAmount)}
+                  </tr>
+                ))}
+                {!loading && unmapped.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm font-body text-ev-gray3">
+                      Todas las cuentas P&L están mapeadas en esta versión.
                     </td>
-                    <td className="px-3 py-2.5 text-xs font-body text-ev-gray4 text-right">{a.movementCount}</td>
-                    <td className="px-3 py-2.5 min-w-[240px]">
-                      {isSaved ? (
-                        <span className="text-xs font-body text-ev-green">✓ Guardado</span>
-                      ) : isDraft ? (
-                        <>
-                          <select
-                            value={selections[k] ?? ""}
-                            onChange={(e) => setSelections((p) => ({ ...p, [k]: e.target.value }))}
-                            className="w-full border border-ev-gray6 px-2 py-1 text-xs font-body focus:outline-none focus:ring-1 focus:ring-ev-black bg-white"
-                          >
-                            <option value="">Seleccionar línea…</option>
-                            {detailLines.map((l) => (
-                              <option key={l.code} value={l.code}>
-                                {"  ".repeat(l.level - 1)}{l.label}
-                              </option>
-                            ))}
-                          </select>
-                          <AiMappingSuggestionButton
-                            accountCode={a.accountCode}
-                            accountName={a.accountName}
-                            versionId={version.id}
-                            onSuggest={(code) => setSelections((p) => ({ ...p, [k]: code }))}
-                          />
-                        </>
-                      ) : (
-                        <span className="text-xs font-body text-ev-gray4">Sin mapear</span>
-                      )}
-                      {errors[k] && <p className="text-[11px] font-body text-red-600 mt-0.5">{errors[k]}</p>}
-                    </td>
-                    {isDraft && (
+                  </tr>
+                )}
+                {!loading && unmapped.map((a) => {
+                  const k = uKey(a);
+                  const hasSelection = !!selections[k];
+                  return (
+                    <tr
+                      key={k}
+                      className={[
+                        "border-t border-ev-gray7",
+                        hasSelection ? "bg-blue-50" : "hover:bg-ev-beige2",
+                      ].join(" ")}
+                    >
+                      <td className="px-3 py-2.5 text-xs font-body text-ev-gray3 whitespace-nowrap">{a.companyName}</td>
                       <td className="px-3 py-2.5">
-                        {!isSaved && (
-                          <button
-                            onClick={() => saveOne(a)}
-                            disabled={!selections[k] || saving[k]}
-                            className="text-xs font-body px-3 py-1 bg-ev-black text-white hover:bg-ev-gray2 disabled:opacity-40 transition-colors"
-                          >
-                            {saving[k] ? "…" : "Guardar"}
-                          </button>
+                        <span className="font-mono text-xs text-ev-black">{a.accountCode}</span>
+                        {a.accountName && <span className="ml-2 text-[11px] font-body text-ev-gray4">{a.accountName}</span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs font-body tabular-nums text-right whitespace-nowrap text-ev-gray2">
+                        {formatCurrency(a.totalAmount)}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs font-body text-ev-gray4 text-right">{a.movementCount}</td>
+                      <td className="px-3 py-2.5 min-w-[240px]">
+                        {isDraft ? (
+                          <>
+                            <select
+                              value={selections[k] ?? ""}
+                              onChange={(e) => setSelections((p) => ({ ...p, [k]: e.target.value }))}
+                              className="w-full border border-ev-gray6 px-2 py-1 text-xs font-body focus:outline-none focus:ring-1 focus:ring-ev-black bg-white"
+                            >
+                              <option value="">Seleccionar línea…</option>
+                              {detailLines.map((l) => (
+                                <option key={l.code} value={l.code}>
+                                  {"  ".repeat(l.level - 1)}{l.label}
+                                </option>
+                              ))}
+                            </select>
+                            <AiMappingSuggestionButton
+                              accountCode={a.accountCode}
+                              accountName={a.accountName}
+                              versionId={version.id}
+                              onSuggest={(code) => setSelections((p) => ({ ...p, [k]: code }))}
+                            />
+                          </>
+                        ) : (
+                          <span className="text-xs font-body text-ev-gray4">Sin mapear</span>
                         )}
                       </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
