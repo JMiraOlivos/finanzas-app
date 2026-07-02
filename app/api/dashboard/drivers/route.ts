@@ -44,9 +44,8 @@ export async function GET(request: NextRequest) {
     companyIds = allowedIds === null ? requested : requested.filter((id) => allowedIds.includes(id));
   }
 
-  const varianceCol   = comparison === "ly" ? "variance_vs_ly"     : "variance_vs_budget";
-  const variancePctCol= comparison === "ly" ? "variance_vs_ly_pct" : "variance_vs_budget_pct";
-  const absImpactCol  = comparison === "ly" ? "abs_impact_vs_ly"   : "abs_impact_vs_budget";
+  const varianceCol   = comparison === "ly" ? "variance_vs_ly"   : "variance_vs_budget";
+  const absImpactCol  = comparison === "ly" ? "abs_impact_vs_ly" : "abs_impact_vs_budget";
   const comparisonCol = comparison === "ly" ? "ly_ytd"             : "budget_ytd";
 
   // Sum across companies, rank by absolute impact

@@ -460,10 +460,9 @@ export async function GET(request: NextRequest) {
   const periodLabel = period.slice(0, 7);
   const generatedAt = new Date().toLocaleDateString("es-CL", { year: "numeric", month: "long", day: "numeric" });
 
+  const pdfElement = React.createElement(BoardPackPDF, { period: periodLabel, generatedAt, kpis, ranking, alerts, pnlLines, driversLy, driversBudget, commentary });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const buffer = await renderToBuffer(
-    React.createElement(BoardPackPDF, { period: periodLabel, generatedAt, kpis, ranking, alerts, pnlLines, driversLy, driversBudget, commentary }) as any
-  );
+  const buffer = await renderToBuffer(pdfElement as any);
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

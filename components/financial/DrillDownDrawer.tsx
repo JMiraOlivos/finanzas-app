@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { formatCurrency, formatPeriodMonth } from "@/lib/formatters";
-import { FinancialRow } from "@/lib/eerr";
 
 type Account = {
   accountCode: string;

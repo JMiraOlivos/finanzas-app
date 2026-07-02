@@ -94,11 +94,11 @@ export async function POST(request: NextRequest) {
   }
 
   // Fetch current state (upsert default draft if missing)
-  const [existing] = await sql`
+  await sql`
     INSERT INTO finanzas.financial_period_closes (period_month)
     VALUES (date_trunc('month', ${period_month}::date)::date)
     ON CONFLICT (period_month) DO NOTHING
-    RETURNING id, status`;
+  `;
 
   const [current] = await sql`
     SELECT id, status FROM finanzas.financial_period_closes
