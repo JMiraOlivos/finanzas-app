@@ -5,6 +5,32 @@ import { logAudit } from "@/lib/audit";
 import { buildFinancialContextPack } from "@/lib/ai/buildFinancialContextPack";
 import { runFinancialAnalysis } from "@/lib/ai/runFinancialAnalysis";
 
+export async function GET(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const period = searchParams.get("period");
+  if (!period) return NextResponse.json(null);
+
+  const periodMonth = period.slice(0, 7) + "-01";
+
+  const rows = await sql`
+    SELECT final_output, created_at
+    FROM finanzas.ai_analysis_runs
+    WHERE period_month = ${periodMonth}::date
+      AND analysis_type = 'period_summary'
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+
+  if (!rows.length) return NextResponse.json(null);
+
+  const output = rows[0].final_output as Record<string, unknown>;
+  output.generatedAt = rows[0].created_at;
+  return NextResponse.json(output);
+}
+
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
