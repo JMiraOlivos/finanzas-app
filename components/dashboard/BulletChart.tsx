@@ -2,13 +2,19 @@
 
 type Status = "red" | "yellow" | "green" | "blue" | "gray";
 
-// Maps to E&V palette where available; standard semantic colors otherwise
+export type BulletZone = {
+  from: number;
+  to: number;    // use Infinity for the last zone
+  color: string;
+};
+
+// Actual bar color — dark & narrow so it reads over the colored zone backgrounds
 const STATUS_FILL: Record<Status, string> = {
-  red:    "#E60000", // ev-red
-  yellow: "#F59E0B",
-  green:  "#527F1F", // ev-green
-  blue:   "#3B82F6",
-  gray:   "#B3B3B3", // ev-gray6
+  red:    "#303030", // always dark: the zone background already communicates red
+  yellow: "#303030",
+  green:  "#303030",
+  blue:   "#303030",
+  gray:   "#B3B3B3", // no target: keep neutral bar
 };
 
 type Props = {
@@ -16,10 +22,11 @@ type Props = {
   target: number | null;
   ly?: number | null;
   status: Status;
+  zones?: BulletZone[];
   width?: number;
 };
 
-const H = 28;
+const H      = 28;
 const TRACK_Y = (H - 10) / 2;
 const TRACK_H = 10;
 const BAR_Y   = (H - 14) / 2;
@@ -31,10 +38,9 @@ function toX(v: number, domainMin: number, domainRange: number, w: number): numb
   return ((v - domainMin) / domainRange) * w;
 }
 
-export function BulletChart({ actual, target, ly, status, width = 240 }: Props) {
+export function BulletChart({ actual, target, ly, status, zones, width = 240 }: Props) {
   const defined = [actual, target ?? null, ly ?? null].filter((v): v is number => v !== null);
 
-  // Empty state: just track
   if (defined.length === 0 || actual === null) {
     return (
       <svg width={width} height={H} aria-hidden="true">
@@ -43,7 +49,7 @@ export function BulletChart({ actual, target, ly, status, width = 240 }: Props) 
     );
   }
 
-  // Domain always includes 0 so zero line and bar origin are meaningful
+  // Domain always includes 0
   const withZero = [...defined, 0];
   const rawMin = Math.min(...withZero);
   const rawMax = Math.max(...withZero);
@@ -54,33 +60,43 @@ export function BulletChart({ actual, target, ly, status, width = 240 }: Props) 
   const domainMax   = rawMax + pad;
   const domainRange = domainMax - domainMin;
 
-  const zeroX   = toX(0, domainMin, domainRange, width);
-  const actualX = toX(actual, domainMin, domainRange, width);
-  const targetX = target !== null ? toX(target, domainMin, domainRange, width) : null;
-  const lyX     = ly !== null && ly !== undefined ? toX(ly, domainMin, domainRange, width) : null;
+  const px = (v: number) => toX(v, domainMin, domainRange, width);
+
+  const zeroX   = px(0);
+  const actualX = px(actual);
+  const targetX = target !== null ? px(target) : null;
+  const lyX     = ly !== null && ly !== undefined ? px(ly) : null;
 
   const barX = Math.min(zeroX, actualX);
-  const barW = Math.max(Math.abs(actualX - zeroX), 1); // min 1px so zero value is visible
+  const barW = Math.max(Math.abs(actualX - zeroX), 1);
 
   return (
     <svg width={width} height={H} aria-hidden="true">
-      {/* Background track */}
-      <rect x={0} y={TRACK_Y} width={width} height={TRACK_H} fill="#E5E7EB" />
+      {/* Zone backgrounds — replace gray track when target is available */}
+      {zones && zones.length > 0
+        ? zones.map((z, i) => {
+            const x1 = Math.max(0, px(z.from));
+            const x2 = Math.min(width, px(Math.min(z.to, domainMax)));
+            if (x2 <= x1) return null;
+            return <rect key={i} x={x1} y={0} width={x2 - x1} height={H} fill={z.color} />;
+          })
+        : <rect x={0} y={TRACK_Y} width={width} height={TRACK_H} fill="#E5E7EB" />
+      }
 
-      {/* Actual bar — origin at zero, extends left when actual is negative */}
+      {/* Actual bar — dark, reads clearly over zone colors */}
       <rect x={barX} y={BAR_Y} width={barW} height={BAR_H} fill={STATUS_FILL[status]} />
 
-      {/* Zero line — only shown when domain includes negative values */}
+      {/* Zero line — only when domain is negative */}
       {domainMin < 0 && (
-        <line x1={zeroX} y1={0} x2={zeroX} y2={H} stroke="#303030" strokeWidth={1} />
+        <line x1={zeroX} y1={0} x2={zeroX} y2={H} stroke="#FFFFFF" strokeWidth={1} opacity={0.6} />
       )}
 
-      {/* Target marker — thick dark tick */}
+      {/* Target marker — thick white tick for visibility over colored zones */}
       {targetX !== null && (
         <line x1={targetX} y1={TICK_Y} x2={targetX} y2={TICK_Y + TICK_H} stroke="#303030" strokeWidth={2.5} />
       )}
 
-      {/* LY marker — thinner dashed gray tick */}
+      {/* LY marker */}
       {lyX !== null && (
         <line
           x1={lyX} y1={TICK_Y + 2} x2={lyX} y2={TICK_Y + TICK_H - 2}

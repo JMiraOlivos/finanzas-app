@@ -107,6 +107,7 @@ export function CompanyBulletGrid({ period, companyIds, onCompanyClick, activeCo
                   {g.metrics.map((m) => (
                     <BulletChartCard
                       key={m.metricCode}
+                      metricCode={m.metricCode}
                       metricLabel={m.metricLabel}
                       actual={m.actual}
                       target={m.target}

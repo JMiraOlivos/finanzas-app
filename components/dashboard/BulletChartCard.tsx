@@ -1,6 +1,6 @@
 "use client";
 
-import { BulletChart } from "./BulletChart";
+import { BulletChart, type BulletZone } from "./BulletChart";
 import { formatCurrency, formatPercentage } from "@/lib/formatters";
 import type { CompanyBulletKpi } from "@/app/api/dashboard/bullets/route";
 
@@ -14,8 +14,35 @@ const STATUS_BADGE: Record<Status, string> = {
   gray:   "bg-neutral-100 text-ev-gray4",
 };
 
+// Light pastel fills for zone backgrounds — bar (dark) sits on top
+const ZONE_COLORS = {
+  red:    "#FECACA", // red-200
+  yellow: "#FDE68A", // amber-200
+  green:  "#BBF7D0", // green-200
+  blue:   "#BFDBFE", // blue-200
+};
+
+function computeZones(
+  target: number | null,
+  metricCode: CompanyBulletKpi["metricCode"]
+): BulletZone[] {
+  if (target === null || target <= 0) return [];
+
+  const [t1, t2, t3] = metricCode === "EBITDA_YTD"
+    ? [0.75, 0.95, 1.05]
+    : [0.80, 0.95, 1.05];
+
+  return [
+    { from: 0,           to: t1 * target, color: ZONE_COLORS.red    },
+    { from: t1 * target, to: t2 * target, color: ZONE_COLORS.yellow  },
+    { from: t2 * target, to: t3 * target, color: ZONE_COLORS.green   },
+    { from: t3 * target, to: Infinity,    color: ZONE_COLORS.blue    },
+  ];
+}
+
 type Props = Pick<
   CompanyBulletKpi,
+  | "metricCode"
   | "metricLabel"
   | "actual"
   | "target"
@@ -27,6 +54,7 @@ type Props = Pick<
 >;
 
 export function BulletChartCard({
+  metricCode,
   metricLabel,
   actual,
   target,
@@ -37,6 +65,7 @@ export function BulletChartCard({
   status,
 }: Props) {
   const varPositive = varianceVsTarget !== null && varianceVsTarget >= 0;
+  const zones = computeZones(target, metricCode);
 
   return (
     <div className="space-y-2">
@@ -48,8 +77,8 @@ export function BulletChartCard({
         </span>
       </div>
 
-      {/* Bullet chart SVG */}
-      <BulletChart actual={actual} target={target} ly={ly} status={status} />
+      {/* Bullet chart SVG with zone backgrounds */}
+      <BulletChart actual={actual} target={target} ly={ly} status={status} zones={zones} />
 
       {/* Values: actual / target / LY */}
       <div className="grid grid-cols-3 gap-1 text-[10px] font-body tabular-nums">
