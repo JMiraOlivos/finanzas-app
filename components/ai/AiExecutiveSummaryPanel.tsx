@@ -182,7 +182,7 @@ export function AiExecutiveSummaryPanel({ period, companyIds }: Props) {
               </div>
 
               {/* Findings */}
-              {result.findings.length > 0 && (
+              {(result.findings?.length ?? 0) > 0 && (
                 <div>
                   <SectionHeader label="Hallazgos clave" />
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -194,7 +194,7 @@ export function AiExecutiveSummaryPanel({ period, companyIds }: Props) {
               )}
 
               {/* Risks */}
-              {result.risks.length > 0 && (
+              {(result.risks?.length ?? 0) > 0 && (
                 <div>
                   <SectionHeader label="Riesgos identificados" />
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -206,7 +206,7 @@ export function AiExecutiveSummaryPanel({ period, companyIds }: Props) {
               )}
 
               {/* Actions */}
-              {result.recommendedActions.length > 0 && (
+              {(result.recommendedActions?.length ?? 0) > 0 && (
                 <div>
                   <SectionHeader label="Acciones recomendadas" />
                   <AiRecommendedActions actions={result.recommendedActions} />
@@ -214,7 +214,7 @@ export function AiExecutiveSummaryPanel({ period, companyIds }: Props) {
               )}
 
               {/* DQ caveats */}
-              {result.dataQualityCaveats.length > 0 && (
+              {(result.dataQualityCaveats?.length ?? 0) > 0 && (
                 <div className="border-t border-ev-gray7 pt-3">
                   <p className="text-[10px] font-body text-ev-gray4 uppercase tracking-wider mb-1">Caveats de datos</p>
                   <ul className="space-y-0.5">
