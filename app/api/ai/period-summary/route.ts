@@ -15,20 +15,27 @@ export async function GET(request: NextRequest) {
 
   const periodMonth = period.slice(0, 7) + "-01";
 
-  const rows = await sql`
-    SELECT final_output, created_at
-    FROM finanzas.ai_analysis_runs
-    WHERE period_month = ${periodMonth}::date
-      AND analysis_type = 'period_summary'
-    ORDER BY created_at DESC
-    LIMIT 1
-  `;
+  try {
+    const rows = await sql`
+      SELECT final_output, created_at
+      FROM finanzas.ai_analysis_runs
+      WHERE period_month = ${periodMonth}::date
+        AND analysis_type = 'period_summary'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
 
-  if (!rows.length) return NextResponse.json(null);
+    if (!rows.length) return NextResponse.json(null);
 
-  const output = rows[0].final_output as Record<string, unknown>;
-  output.generatedAt = rows[0].created_at;
-  return NextResponse.json(output);
+    const output = {
+      ...(rows[0].final_output as Record<string, unknown>),
+      generatedAt: (rows[0].created_at as Date).toISOString(),
+    };
+    return NextResponse.json(output);
+  } catch (err) {
+    console.error("[ai/period-summary GET] error:", err);
+    return NextResponse.json(null);
+  }
 }
 
 export async function POST(request: NextRequest) {
