@@ -5,7 +5,6 @@
  *
  * Requires DATABASE_URL in environment (or .env.local).
  */
-import { createHash } from "crypto";
 import postgres from "postgres";
 import * as readline from "readline";
 
