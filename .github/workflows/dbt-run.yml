@@ -49,11 +49,11 @@ jobs:
                 threads: 4
           EOF
 
-      - name: dbt run (refresh mart tables)
+      - name: dbt run (staging + intermediate views + mart tables)
         env:
           NEON_USER: ${{ secrets.NEON_USER }}
           NEON_PASSWORD: ${{ secrets.NEON_PASSWORD }}
-        run: dbt run --select tag:mart
+        run: dbt run
         working-directory: dbt
 
       - name: dbt test
