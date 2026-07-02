@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const rows = await sql`
-      SELECT final_output::text AS json_text, created_at
+      SELECT final_output, created_at
       FROM finanzas.ai_analysis_runs
       WHERE period_month = ${periodMonth}::date
         AND analysis_type = 'period_summary'
@@ -27,7 +27,12 @@ export async function GET(request: NextRequest) {
 
     if (!rows.length) return NextResponse.json(null);
 
-    const parsed = JSON.parse(rows[0].json_text as string) as Record<string, unknown>;
+    // postgres.js returns JSONB strings as JS strings — parse if needed
+    const raw = rows[0].final_output;
+    const parsed: Record<string, unknown> = typeof raw === "string"
+      ? (JSON.parse(raw) as Record<string, unknown>)
+      : (raw as Record<string, unknown>);
+
     const createdAt = rows[0].created_at instanceof Date
       ? rows[0].created_at.toISOString()
       : String(rows[0].created_at);
@@ -81,9 +86,6 @@ export async function POST(request: NextRequest) {
 
   // Persist run — awaited so errors surface in Vercel logs
   const periodMonth = period.slice(0, 7) + "-01";
-  const scopeJson   = JSON.stringify(contextPack.scope ?? {});
-  const analystJson = JSON.stringify({ findings: result.findings, risks: result.risks, recommendedActions: result.recommendedActions });
-  const finalJson   = JSON.stringify(result);
   const createdBy   = user.id ?? null;
 
   await sql`
@@ -92,13 +94,13 @@ export async function POST(request: NextRequest) {
        analyst_output, cfo_output, final_output, created_by)
     VALUES (
       ${periodMonth}::date,
-      ${scopeJson}::jsonb,
+      ${sql.json(contextPack.scope ?? {})},
       'period_summary',
       ${result.promptVersion},
       ${result.modelName},
-      ${analystJson}::jsonb,
+      ${sql.json({ findings: result.findings, risks: result.risks, recommendedActions: result.recommendedActions })},
       ${result.executiveSummary},
-      ${finalJson}::jsonb,
+      ${sql.json(result)},
       ${createdBy}
     )
   `.catch((err) => { console.error("[ai/period-summary] INSERT failed:", err); });
