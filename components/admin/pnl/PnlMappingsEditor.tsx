@@ -29,6 +29,7 @@ type PnlLine = {
   label: string;
   level: number;
   lineType: string;
+  isActive: boolean;
 };
 
 type Version = {
