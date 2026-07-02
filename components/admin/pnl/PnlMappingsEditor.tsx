@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { formatCurrency } from "@/lib/formatters";
 import { AiMappingSuggestionButton } from "./AiMappingSuggestionButton";
+import { SearchableLineSelect } from "./SearchableLineSelect";
 
 type UnmappedAccount = {
   companyId: string;
@@ -52,6 +53,9 @@ export function PnlMappingsEditor({ version }: Props) {
   const [selections,   setSelections]   = useState<Record<string, string>>({});
   const [bulkSaving,   setBulkSaving]   = useState(false);
   const [bulkResult,   setBulkResult]   = useState<number | null>(null);
+  const [remaps,       setRemaps]       = useState<Record<string, string>>({});  // mappingId → new pnlLineCode
+  const [remapSaving,  setRemapSaving]  = useState(false);
+  const [remapResult,  setRemapResult]  = useState<number | null>(null);
   const [deleting,     setDeleting]     = useState<string | null>(null);
   const [globalError,  setGlobalError]  = useState<string | null>(null);
 
@@ -77,13 +81,19 @@ export function PnlMappingsEditor({ version }: Props) {
     setMappings(m);
     setLines(l);
     setSelections({});
+    setRemaps({});
     setBulkResult(null);
+    setRemapResult(null);
     setLoading(false);
   }, [version.id]);
 
   useEffect(() => { void load(); }, [load]);
 
-  const detailLines = lines.filter((l) => l.lineType === "detail" && l.isActive !== false);
+  const detailLines = lines
+    .filter((l) => l.lineType === "detail" && l.isActive !== false)
+    .sort((a, b) => a.label.localeCompare(b.label, "es"));
+
+  const lineOptions = detailLines.map((l) => ({ value: l.code, label: l.label }));
 
   function uKey(a: UnmappedAccount) { return `${a.companyId}|${a.accountCode}`; }
 
@@ -119,6 +129,40 @@ export function PnlMappingsEditor({ version }: Props) {
       setBulkResult(d.inserted);
       setBulkSaving(false);
       // Reload to reflect saved accounts in both tabs
+      await load();
+    }
+  }
+
+  const remapCount = Object.keys(remaps).length;
+
+  async function saveRemaps() {
+    const changed = activeMappings.filter((m) => remaps[m.id] && remaps[m.id] !== m.pnlLineCode);
+    if (changed.length === 0) return;
+
+    setRemapSaving(true);
+    setGlobalError(null);
+
+    const items = changed.map((m) => ({
+      companyId:   m.companyId,
+      accountCode: m.accountCode,
+      accountName: m.accountName,
+      pnlLineCode: remaps[m.id],
+    }));
+
+    const res = await fetch(`/api/admin/pnl/versions/${version.id}/mappings/bulk`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(items),
+    });
+
+    if (!res.ok) {
+      const d = await res.json() as { error?: string };
+      setGlobalError(d.error ?? "Error al guardar cambios");
+      setRemapSaving(false);
+    } else {
+      const d = await res.json() as { inserted: number };
+      setRemapResult(d.inserted);
+      setRemapSaving(false);
       await load();
     }
   }
@@ -247,18 +291,11 @@ export function PnlMappingsEditor({ version }: Props) {
                       <td className="px-3 py-2.5 min-w-[240px]">
                         {isDraft ? (
                           <>
-                            <select
+                            <SearchableLineSelect
                               value={selections[k] ?? ""}
-                              onChange={(e) => setSelections((p) => ({ ...p, [k]: e.target.value }))}
-                              className="w-full border border-ev-gray6 px-2 py-1 text-xs font-body focus:outline-none focus:ring-1 focus:ring-ev-black bg-white"
-                            >
-                              <option value="">Seleccionar línea…</option>
-                              {detailLines.map((l) => (
-                                <option key={l.code} value={l.code}>
-                                  {"  ".repeat(l.level - 1)}{l.label}
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(code) => setSelections((p) => ({ ...p, [k]: code }))}
+                              options={lineOptions}
+                            />
                             <AiMappingSuggestionButton
                               accountCode={a.accountCode}
                               accountName={a.accountName}
@@ -281,62 +318,116 @@ export function PnlMappingsEditor({ version }: Props) {
 
       {/* Tab: Mappings activos */}
       {tab === "existing" && (
-        <div className="border border-ev-gray7 bg-white overflow-hidden">
-          <table className="min-w-full text-sm border-collapse">
-            <thead className="bg-ev-beige2">
-              <tr>
-                {["Cuenta", "Empresa", "Línea P&L", "Signo", isDraft ? "" : undefined]
-                  .filter(Boolean)
-                  .map((h) => (
-                    <th key={h} className="px-3 py-2.5 text-left text-[10px] font-body uppercase tracking-[0.1em] text-ev-gray3 whitespace-nowrap">
-                      {h}
-                    </th>
-                  ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading && Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="border-t border-ev-gray7">
-                  <td colSpan={5} className="px-3 py-3">
-                    <div className="h-3.5 bg-neutral-100 animate-pulse rounded" />
-                  </td>
-                </tr>
-              ))}
-              {!loading && activeMappings.length === 0 && (
+        <div className="space-y-2">
+          {/* Remap toolbar */}
+          {isDraft && !loading && activeMappings.length > 0 && (
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-body text-ev-gray3">
+                {remapCount > 0
+                  ? `${remapCount} mapping${remapCount !== 1 ? "s" : ""} con cambios pendientes`
+                  : "Cambia la línea P&L de cualquier cuenta en el dropdown"}
+              </p>
+              <div className="flex items-center gap-3">
+                {remapResult !== null && (
+                  <span className="text-xs font-body text-ev-green">✓ {remapResult} actualizados</span>
+                )}
+                <button
+                  onClick={saveRemaps}
+                  disabled={remapCount === 0 || remapSaving}
+                  className="px-4 py-1.5 text-xs font-body bg-ev-black text-white hover:bg-ev-gray2 disabled:opacity-40 transition-colors"
+                >
+                  {remapSaving ? "Guardando..." : `Guardar cambios (${remapCount})`}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="border border-ev-gray7 bg-white overflow-hidden">
+            <table className="min-w-full text-sm border-collapse">
+              <thead className="bg-ev-beige2">
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm font-body text-ev-gray3">
-                    Esta versión no tiene mappings aún.
-                  </td>
+                  {["Cuenta", "Empresa", "Línea P&L", "Signo", isDraft ? "" : undefined]
+                    .filter(Boolean)
+                    .map((h) => (
+                      <th key={h} className="px-3 py-2.5 text-left text-[10px] font-body uppercase tracking-[0.1em] text-ev-gray3 whitespace-nowrap">
+                        {h}
+                      </th>
+                    ))}
                 </tr>
-              )}
-              {!loading && activeMappings.map((m) => (
-                <tr key={m.id} className="border-t border-ev-gray7 hover:bg-ev-beige2">
-                  <td className="px-3 py-2.5">
-                    <span className="font-mono text-xs text-ev-black">{m.accountCode}</span>
-                    {m.accountName && <span className="ml-2 text-[11px] font-body text-ev-gray4">{m.accountName}</span>}
-                  </td>
-                  <td className="px-3 py-2.5 text-xs font-body text-ev-gray3">
-                    {m.companyName ?? <span className="text-ev-gray5 italic">Global</span>}
-                  </td>
-                  <td className="px-3 py-2.5 text-xs font-body font-mono text-ev-black">{m.pnlLineCode}</td>
-                  <td className="px-3 py-2.5 text-xs font-body text-ev-gray4">
-                    {m.signMultiplier === 1 ? "+" : "−"}
-                  </td>
-                  {isDraft && (
-                    <td className="px-3 py-2.5">
-                      <button
-                        onClick={() => deleteMapping(m.id)}
-                        disabled={deleting === m.id}
-                        className="text-xs font-body text-red-500 hover:text-red-700 disabled:opacity-40"
-                      >
-                        {deleting === m.id ? "..." : "Desactivar"}
-                      </button>
+              </thead>
+              <tbody>
+                {loading && Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-t border-ev-gray7">
+                    <td colSpan={5} className="px-3 py-3">
+                      <div className="h-3.5 bg-neutral-100 animate-pulse rounded" />
                     </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </tr>
+                ))}
+                {!loading && activeMappings.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm font-body text-ev-gray3">
+                      Esta versión no tiene mappings aún.
+                    </td>
+                  </tr>
+                )}
+                {!loading && activeMappings.map((m) => {
+                  const currentCode = remaps[m.id] ?? m.pnlLineCode;
+                  const changed = remaps[m.id] && remaps[m.id] !== m.pnlLineCode;
+                  return (
+                    <tr
+                      key={m.id}
+                      className={[
+                        "border-t border-ev-gray7",
+                        changed ? "bg-blue-50" : "hover:bg-ev-beige2",
+                      ].join(" ")}
+                    >
+                      <td className="px-3 py-2.5">
+                        <span className="font-mono text-xs text-ev-black">{m.accountCode}</span>
+                        {m.accountName && <span className="ml-2 text-[11px] font-body text-ev-gray4">{m.accountName}</span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs font-body text-ev-gray3">
+                        {m.companyName ?? <span className="text-ev-gray5 italic">Global</span>}
+                      </td>
+                      <td className="px-3 py-2.5 min-w-[200px]">
+                        {isDraft ? (
+                          <SearchableLineSelect
+                            value={currentCode}
+                            onChange={(val) => {
+                              setRemaps((prev) => {
+                                if (val === m.pnlLineCode) {
+                                  const next = { ...prev };
+                                  delete next[m.id];
+                                  return next;
+                                }
+                                return { ...prev, [m.id]: val };
+                              });
+                            }}
+                            options={lineOptions}
+                          />
+                        ) : (
+                          <span className="font-mono text-xs text-ev-black">{m.pnlLineCode}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs font-body text-ev-gray4">
+                        {m.signMultiplier === 1 ? "+" : "−"}
+                      </td>
+                      {isDraft && (
+                        <td className="px-3 py-2.5">
+                          <button
+                            onClick={() => deleteMapping(m.id)}
+                            disabled={deleting === m.id}
+                            className="text-xs font-body text-red-500 hover:text-red-700 disabled:opacity-40"
+                          >
+                            {deleting === m.id ? "..." : "Desactivar"}
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
