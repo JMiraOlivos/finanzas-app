@@ -92,8 +92,6 @@ export async function buildFinancialContextPack(args: BuildArgs): Promise<Financ
   // ── Drivers ───────────────────────────────────────────────────────────────
 
   const mapDrivers = (rows: Record<string, unknown>[], basis: "budget" | "ly"): VarianceDriverContext[] => {
-    const varCol = basis === "budget" ? "variance_vs_budget" : "variance_vs_ly";
-    const pctCol = basis === "budget" ? "variance_vs_budget_pct" : "variance_vs_ly_pct";
     return rows.slice(0, 20).map((d) => ({
       pnlLineCode:          String(d.pnl_line_code),
       pnlLineLabel:         String(d.pnl_line_label),
@@ -101,8 +99,8 @@ export async function buildFinancialContextPack(args: BuildArgs): Promise<Financ
       companyName:          String(d.company_name),
       actual:               n(d.actual_ytd),
       budget:               n(d.budget_ytd),
-      varianceVsBudget:     n(d[varCol]),
-      varianceVsBudgetPct:  n(d[pctCol]),
+      varianceVsBudget:     n(d.variance_vs_budget),
+      varianceVsBudgetPct:  n(d.variance_vs_budget_pct),
       ly:                   n(d.ly_ytd),
       varianceVsLy:         n(d.variance_vs_ly),
       varianceVsLyPct:      n(d.variance_vs_ly_pct),
@@ -142,7 +140,7 @@ export async function buildFinancialContextPack(args: BuildArgs): Promise<Financ
     pnlLineCode: c.pnl_line_code ? String(c.pnl_line_code) : null,
     body:        String(c.body),
     createdAt:   String(c.created_at),
-    source:      String(c.source ?? "manual"),
+    source:      "manual",
   }));
 
   // ── Period closes ─────────────────────────────────────────────────────────
@@ -326,10 +324,10 @@ async function fetchComments(period: string, ids: string[] | null, pnlLineCode: 
   try {
     const monthStart = period.slice(0, 7) + "-01";
     // financial_comments may have source column (added in PR 6 migration)
+    // source column is added in migration 021 (PR 6) — hardcode 'manual' until then
     return ids === null
       ? await sql`
-          SELECT id, company_id, pnl_line_code, body, created_at,
-                 COALESCE(source, 'manual') AS source
+          SELECT id, company_id, pnl_line_code, body, created_at
           FROM finanzas.financial_comments
           WHERE period_month = ${monthStart}::date
             AND (${pnlLineCode}::text IS NULL OR pnl_line_code = ${pnlLineCode ?? ""})
@@ -337,8 +335,7 @@ async function fetchComments(period: string, ids: string[] | null, pnlLineCode: 
           LIMIT 20
         `
       : await sql`
-          SELECT id, company_id, pnl_line_code, body, created_at,
-                 COALESCE(source, 'manual') AS source
+          SELECT id, company_id, pnl_line_code, body, created_at
           FROM finanzas.financial_comments
           WHERE period_month = ${monthStart}::date
             AND (company_id = ANY(${ids}::uuid[]) OR company_id IS NULL)

@@ -99,6 +99,34 @@ export type DbtFreshnessContext = {
   ageMinutes: number | null; // minutes since completedAt
 };
 
+// ── AI analysis response ──────────────────────────────────────────────────
+
+export type AiFinding = {
+  category: string;
+  severity: "high" | "medium" | "low";
+  title: string;
+  detail: string;
+};
+
+export type AiAction = {
+  priority: "high" | "medium" | "low";
+  action: string;
+  owner?: string;
+};
+
+export type PeriodSummaryResponse = {
+  headline: string;
+  executiveSummary: string;
+  findings: AiFinding[];
+  risks: AiFinding[];
+  recommendedActions: AiAction[];
+  dataQualityCaveats: string[];
+  periodLabel: string;
+  modelName: string;
+  promptVersion: string;
+  generatedAt: string;
+};
+
 // ── Full context pack ─────────────────────────────────────────────────────
 
 export type FinancialContextPack = {

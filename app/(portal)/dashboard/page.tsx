@@ -271,6 +271,9 @@ function DashboardContent() {
         activeCompanyId={companyIdParam}
       />
 
+      {/* ── Análisis ejecutivo IA ── */}
+      <AiExecutiveSummaryPanel period={period} companyIds={companyIdParam} />
+
       {/* ── Bloque 2: Alertas + Calidad de datos ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <AlertsPanel alerts={alerts} loading={alertsLoading} />
