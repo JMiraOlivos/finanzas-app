@@ -45,6 +45,14 @@ const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../sql"
 const MIGRATION_FILES = [
   "020_ai_alerts.sql",
   "021_financial_comments_ai_status.sql",
+  // PR 1: P&L Builder — tablas versionadas
+  "022_pnl_structure_versions.sql",
+  "023_pnl_lines_versioned.sql",
+  "024_account_pnl_mappings_versioned.sql",
+  "025_pnl_formula_components_versioned.sql",
+  "026_pnl_structure_change_log.sql",
+  "027_period_close_structure_version.sql",
+  "028_pnl_structure_seed_current.sql",
 ];
 
 async function run() {
