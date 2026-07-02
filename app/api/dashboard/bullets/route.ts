@@ -103,5 +103,47 @@ export async function GET(request: NextRequest) {
       status:              r.status as "red" | "yellow" | "green" | "blue" | "gray",
     }));
 
+  // Consolidated "Total Grupo" rows — only when there are multiple companies
+  const uniqueCompanies = new Set(result.map((r) => r.companyId));
+  if (uniqueCompanies.size > 1) {
+    const metricCodes: Array<"REVENUE_YTD" | "EBITDA_YTD"> = ["REVENUE_YTD", "EBITDA_YTD"];
+    const totalRows: CompanyBulletKpi[] = metricCodes.flatMap((code) => {
+      const subset = result.filter((r) => r.metricCode === code);
+      if (subset.length === 0) return [];
+
+      const actual      = subset.reduce((s, r) => s + (r.actual  ?? 0), 0);
+      const target      = subset.some((r) => r.target !== null)
+        ? subset.reduce((s, r) => s + (r.target ?? 0), 0) : null;
+      const ly          = subset.some((r) => r.ly !== null)
+        ? subset.reduce((s, r) => s + (r.ly ?? 0), 0)     : null;
+
+      const varianceVsTarget    = target !== null ? actual - target : null;
+      const varianceVsTargetPct = target          ? (actual - target) / Math.abs(target) : null;
+      const attainmentPct       = target          ? actual / target : null;
+      const varianceVsLy        = ly !== null     ? actual - ly : null;
+      const varianceVsLyPct     = ly              ? (actual - ly) / Math.abs(ly) : null;
+
+      let status: CompanyBulletKpi["status"] = "gray";
+      if (attainmentPct !== null && target !== null && target > 0) {
+        const [t1, t2, t3] = code === "EBITDA_YTD" ? [0.75, 0.95, 1.05] : [0.80, 0.95, 1.05];
+        if      (attainmentPct < t1) status = "red";
+        else if (attainmentPct < t2) status = "yellow";
+        else if (attainmentPct <= t3) status = "green";
+        else                          status = "blue";
+      }
+
+      return [{
+        companyId: "__total__", companyName: "Total Grupo",
+        periodMonth: subset[0].periodMonth, metricCode: code,
+        metricLabel: subset[0].metricLabel,
+        actual, target, ly,
+        varianceVsTarget, varianceVsTargetPct, attainmentPct,
+        varianceVsLy, varianceVsLyPct, status,
+      }];
+    });
+
+    return NextResponse.json([...totalRows, ...result]);
+  }
+
   return NextResponse.json(result);
 }

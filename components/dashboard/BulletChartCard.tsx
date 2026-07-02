@@ -51,6 +51,8 @@ type Props = Pick<
   | "attainmentPct"
   | "varianceVsTarget"
   | "varianceVsTargetPct"
+  | "varianceVsLy"
+  | "varianceVsLyPct"
   | "status"
 > & {
   unit?: CurrencyUnit;
@@ -68,13 +70,16 @@ export function BulletChartCard({
   attainmentPct,
   varianceVsTarget,
   varianceVsTargetPct,
+  varianceVsLy,
+  varianceVsLyPct,
   status,
   unit = "millions",
   period,
   companyId,
   companyIds,
 }: Props) {
-  const varPositive = varianceVsTarget !== null && varianceVsTarget >= 0;
+  const varPositive   = varianceVsTarget !== null && varianceVsTarget >= 0;
+  const varLyPositive = varianceVsLy !== null && varianceVsLy >= 0;
   const zones = computeZones(target, metricCode);
 
   return (
@@ -117,7 +122,7 @@ export function BulletChartCard({
         </div>
       </div>
 
-      {/* Variance vs target */}
+      {/* Variance vs budget */}
       {varianceVsTarget !== null && (
         <div className={["text-[10px] font-body tabular-nums", varPositive ? "text-ev-green" : "text-ev-red"].join(" ")}>
           {varPositive ? "▲" : "▼"}{" "}
@@ -128,6 +133,20 @@ export function BulletChartCard({
             </span>
           )}
           {" "}vs ppto
+        </div>
+      )}
+
+      {/* Variance vs LY */}
+      {varianceVsLy !== null && (
+        <div className={["text-[10px] font-body tabular-nums", varLyPositive ? "text-ev-green" : "text-ev-red"].join(" ")}>
+          {varLyPositive ? "▲" : "▼"}{" "}
+          {formatCurrencyUnit(Math.abs(varianceVsLy), unit)}
+          {varianceVsLyPct !== null && (
+            <span className="ml-1 opacity-70">
+              ({formatPercentage(Math.abs(varianceVsLyPct))})
+            </span>
+          )}
+          {" "}vs LY
         </div>
       )}
     </div>

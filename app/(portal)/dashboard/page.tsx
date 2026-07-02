@@ -10,6 +10,7 @@ import { CompanyRanking, type CompanyRankingRow } from "@/components/dashboard/C
 import { ActiveFiltersBar } from "@/components/dashboard/ActiveFiltersBar";
 import { VarianceDriversPanel } from "@/components/dashboard/VarianceDriversPanel";
 import { CompanyBulletGrid } from "@/components/dashboard/CompanyBulletGrid";
+import { CompanyMultiSelect } from "@/components/dashboard/CompanyMultiSelect";
 import { DataFreshnessBadge } from "@/components/dashboard/DataFreshnessBadge";
 import { AiExecutiveSummaryPanel } from "@/components/ai/AiExecutiveSummaryPanel";
 import { BoardCommentaryEditor } from "@/components/ai/BoardCommentaryEditor";
@@ -49,17 +50,23 @@ function defaultPeriod() {
 }
 
 function DashboardContent() {
-  const router     = useRouter();
-  const pathname   = usePathname();
-  const sp         = useSearchParams();
+  const router   = useRouter();
+  const pathname = usePathname();
+  const sp       = useSearchParams();
 
-  const periodParam    = sp.get("period");
-  const companyIdParam = sp.get("companyId");
-  const metricParam    = sp.get("metric");
+  const periodParam   = sp.get("period");
+  const companiesParam = sp.get("companies"); // comma-separated company UUIDs
+  const metricParam   = sp.get("metric");
 
-  const [period,    setPeriodState] = useState(periodParam ?? defaultPeriod());
-  const [unit,      setUnit]        = useState<CurrencyUnit>("millions");
-  const [chatOpen,  setChatOpen]    = useState(false);
+  const [period,   setPeriodState] = useState(periodParam ?? defaultPeriod());
+  const [unit,     setUnit]        = useState<CurrencyUnit>("millions");
+  const [chatOpen, setChatOpen]    = useState(false);
+
+  // Selected company IDs (empty = all companies)
+  const selectedCompanyIds: string[] = companiesParam
+    ? companiesParam.split(",").filter(Boolean)
+    : [];
+  const companyIdsParam = selectedCompanyIds.length > 0 ? selectedCompanyIds.join(",") : undefined;
 
   const [kpis,           setKpis]           = useState<KpiMetric[]>([]);
   const [chartsData,     setChartsData]     = useState<ChartsData | null>(null);
@@ -73,7 +80,7 @@ function DashboardContent() {
   const [controlLoading, setControlLoading] = useState(true);
   const [error,          setError]          = useState<string | null>(null);
 
-  function setFilter(key: string, value: string | null) {
+  function setParam(key: string, value: string | null) {
     const params = new URLSearchParams(sp.toString());
     if (value) params.set(key, value); else params.delete(key);
     router.push(`${pathname}?${params.toString()}`);
@@ -81,7 +88,21 @@ function DashboardContent() {
 
   function setPeriod(p: string) {
     setPeriodState(p);
-    setFilter("period", p);
+    setParam("period", p);
+  }
+
+  function setCompanies(ids: string[]) {
+    const params = new URLSearchParams(sp.toString());
+    if (ids.length > 0) params.set("companies", ids.join(","));
+    else params.delete("companies");
+    params.delete("metric");
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
+  function toggleCompany(id: string) {
+    const current = new Set(selectedCompanyIds);
+    if (current.has(id)) current.delete(id); else current.add(id);
+    setCompanies([...current]);
   }
 
   function clearFilters() {
@@ -89,8 +110,6 @@ function DashboardContent() {
     if (period !== defaultPeriod()) params.set("period", period);
     router.push(params.toString() ? `${pathname}?${params.toString()}` : pathname);
   }
-
-  const companyIdsParam = companyIdParam ?? undefined;
 
   const fetchKpis = useCallback(() => {
     setKpisLoading(true);
@@ -144,11 +163,11 @@ function DashboardContent() {
       .finally(() => setControlLoading(false));
   }, [period]);
 
-  useEffect(() => { fetchKpis(); }, [fetchKpis]);
+  useEffect(() => { fetchKpis(); },   [fetchKpis]);
   useEffect(() => { fetchCharts(); }, [fetchCharts]);
-  useEffect(() => { fetchRanking(); }, [fetchRanking]);
+  useEffect(() => { fetchRanking(); },[fetchRanking]);
   useEffect(() => { fetchAlerts(); }, [fetchAlerts]);
-  useEffect(() => { fetchControl(); }, [fetchControl]);
+  useEffect(() => { fetchControl(); },[fetchControl]);
 
   const kpiMap = Object.fromEntries(kpis.map((k) => [k.code, k]));
 
@@ -159,13 +178,24 @@ function DashboardContent() {
             k.code !== "EBITDA_BUDGET_ATTAIN"
   );
 
-  const activeCompanyName = ranking.find((r) => r.companyId === companyIdParam)?.companyName ?? null;
+  // Label for the active filters bar
+  const activeCompanyLabel = selectedCompanyIds.length === 0 ? null
+    : selectedCompanyIds.length === 1
+    ? (ranking.find((r) => r.companyId === selectedCompanyIds[0])?.companyName ?? null)
+    : `${selectedCompanyIds.length} empresas`;
+
   const activeMetricLabel = metricParam ? (kpiMap[metricParam]?.label ?? null) : null;
+
+  // Company list derived from ranking for the multi-select dropdown
+  const companyList = ranking.map((r) => ({ id: r.companyId, name: r.companyName }));
+
+  // For CompanyRanking highlight — only when a single company is selected
+  const singleActiveCompanyId = selectedCompanyIds.length === 1 ? selectedCompanyIds[0] : null;
 
   return (
     <div className="space-y-6">
 
-      {/* ── Header + Period Selector ── */}
+      {/* ── Header + Controls ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-head text-ev-black">Dashboard Ejecutivo</h1>
@@ -174,7 +204,7 @@ function DashboardContent() {
             <DataFreshnessBadge />
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Currency unit toggle */}
           <div className="flex border border-ev-gray6 overflow-hidden text-xs">
             {([ ["millions", "MM"], ["thousands", "M"], ["full", "#"] ] as [CurrencyUnit, string][]).map(([u, label], i) => (
@@ -191,6 +221,16 @@ function DashboardContent() {
               </button>
             ))}
           </div>
+
+          {/* Multi-company selector */}
+          <CompanyMultiSelect
+            companies={companyList}
+            selectedIds={selectedCompanyIds}
+            onChange={setCompanies}
+            loading={rankingLoading && companyList.length === 0}
+          />
+
+          {/* Period selector */}
           <input
             type="month"
             value={period.slice(0, 7)}
@@ -204,7 +244,7 @@ function DashboardContent() {
             className="border border-ev-gray6 px-3 py-1.5 text-sm font-body focus:outline-none focus:ring-1 focus:ring-ev-black"
           />
           <a
-            href={`/api/export/board-pack?period=${period}`}
+            href={`/api/export/board-pack?period=${period}${companyIdsParam ? `&companyIds=${companyIdsParam}` : ""}`}
             download
             className="border border-ev-gray6 px-3 py-1.5 text-sm font-body text-ev-gray3 hover:text-ev-black hover:border-ev-black transition-colors"
           >
@@ -221,7 +261,7 @@ function DashboardContent() {
 
       {/* ── Active Filters Bar ── */}
       <ActiveFiltersBar
-        companyName={activeCompanyName}
+        companyName={activeCompanyLabel}
         metricLabel={activeMetricLabel}
         onClear={clearFilters}
       />
@@ -250,11 +290,11 @@ function DashboardContent() {
                 vsPriorPct={VS_PRIOR_MAP[code]  ? kpiMap[VS_PRIOR_MAP[code]]?.value  : undefined}
                 vsBudgetPct={VS_BUDGET_MAP[code] ? kpiMap[VS_BUDGET_MAP[code]]?.value : undefined}
                 isActive={metricParam === code}
-                onClick={() => setFilter("metric", metricParam === code ? null : code)}
+                onClick={() => setParam("metric", metricParam === code ? null : code)}
                 actions={(code === "REVENUE_YTD" || code === "EBITDA_YTD") ? (
                   <ExplainButton
                     period={period}
-                    companyIds={companyIdParam}
+                    companyIds={companyIdsParam ?? null}
                     targetType="kpi"
                     metricCode={code}
                   />
@@ -283,17 +323,17 @@ function DashboardContent() {
       {/* ── Bullet Charts: cumplimiento por empresa ── */}
       <CompanyBulletGrid
         period={period}
-        companyIds={companyIdParam}
+        companyIds={companyIdsParam}
         unit={unit}
-        onCompanyClick={(id) => setFilter("companyId", companyIdParam === id ? null : id)}
-        activeCompanyId={companyIdParam}
+        onCompanyClick={toggleCompany}
+        activeCompanyIds={selectedCompanyIds}
       />
 
       {/* ── Análisis ejecutivo IA ── */}
-      <AiExecutiveSummaryPanel period={period} companyIds={companyIdParam} />
+      <AiExecutiveSummaryPanel period={period} companyIds={companyIdsParam ?? null} />
 
       {/* ── Comentario para el Directorio ── */}
-      <BoardCommentaryEditor period={period} companyIds={companyIdParam} />
+      <BoardCommentaryEditor period={period} companyIds={companyIdsParam ?? null} />
 
       {/* ── Bloque 2: Alertas + Calidad de datos ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -306,12 +346,12 @@ function DashboardContent() {
         rows={ranking}
         loading={rankingLoading}
         unit={unit}
-        activeCompanyId={companyIdParam}
-        onCompanyClick={(id) => setFilter("companyId", companyIdParam === id ? null : id)}
+        activeCompanyId={singleActiveCompanyId}
+        onCompanyClick={toggleCompany}
       />
 
       {/* ── Bloque 4: Variance Drivers ── */}
-      <VarianceDriversPanel period={period} companyIds={companyIdParam} unit={unit} />
+      <VarianceDriversPanel period={period} companyIds={companyIdsParam} unit={unit} />
 
       {/* ── Bloque 5 & 6: Charts ── */}
       {chartsLoading ? (
@@ -331,7 +371,7 @@ function DashboardContent() {
         open={chatOpen}
         onClose={() => setChatOpen(false)}
         period={period}
-        companyIds={companyIdParam}
+        companyIds={companyIdsParam ?? null}
       />
 
     </div>
