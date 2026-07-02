@@ -54,6 +54,10 @@ const S = StyleSheet.create({
   // Divider
   divider: { height: 1, backgroundColor: EV.gray7, marginVertical: 20 },
 
+  // Board commentary
+  commentaryPara: { fontSize: 10, color: EV.black, lineHeight: 1.6, marginBottom: 10 },
+  commentaryNote: { fontSize: 8, color: EV.gray3, marginTop: 20, fontStyle: "italic" },
+
   // Alert
   alertRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   alertDot: { width: 6, height: 6, borderRadius: 3 },
@@ -120,7 +124,7 @@ function DriversSection({
   );
 }
 
-function BoardPackPDF({ period, generatedAt, kpis, ranking, alerts, pnlLines, driversLy, driversBudget }: {
+function BoardPackPDF({ period, generatedAt, kpis, ranking, alerts, pnlLines, driversLy, driversBudget, commentary }: {
   period: string;
   generatedAt: string;
   kpis: KpiMap;
@@ -129,7 +133,12 @@ function BoardPackPDF({ period, generatedAt, kpis, ranking, alerts, pnlLines, dr
   pnlLines: PnlRow[];
   driversLy:     { positive: DbDriverRow[]; negative: DbDriverRow[] };
   driversBudget: { positive: DbDriverRow[]; negative: DbDriverRow[] };
+  commentary: string | null;
 }) {
+  const commentaryParagraphs = commentary
+    ? commentary.split(/\n\n+/).filter((p) => p.trim())
+    : [];
+
   return React.createElement(Document, {},
 
     // ── Cover ────────────────────────────────────────────────────────────────
@@ -139,6 +148,21 @@ function BoardPackPDF({ period, generatedAt, kpis, ranking, alerts, pnlLines, dr
       React.createElement(Text, { style: S.coverSub }, "Engel & Völkers"),
       React.createElement(Text, { style: S.coverPeriod }, `Período: ${period}`),
       React.createElement(Text, { style: S.coverDate }, `Generado el ${generatedAt}`),
+    ),
+
+    // ── Board Commentary ─────────────────────────────────────────────────────
+    React.createElement(Page, { size: "A4", style: S.page },
+      React.createElement(Text, { style: S.sectionTitle }, "Comentario Ejecutivo del CFO"),
+      React.createElement(View, { style: S.divider }),
+      ...(commentaryParagraphs.length > 0
+        ? commentaryParagraphs.map((p, i) =>
+            React.createElement(Text, { key: i, style: S.commentaryPara }, p.trim())
+          )
+        : [React.createElement(Text, { style: S.alertDetail },
+            "Comentario ejecutivo pendiente de aprobación.")]),
+      React.createElement(Text, { style: S.commentaryNote },
+        "Comentario generado por IA y aprobado por el equipo financiero."
+      ),
     ),
 
     // ── KPIs + Alerts ────────────────────────────────────────────────────────
@@ -388,13 +412,29 @@ export async function GET(request: NextRequest) {
     negative: driversBudgetRows.filter((r) => Number(r.variance_amount) < 0).map(toDriverRow),
   };
 
+  // Fetch approved AI commentary (safely — migration 021 may not be applied yet)
+  let commentary: string | null = null;
+  try {
+    const [commentRow] = await sql`
+      SELECT comment
+      FROM finanzas.financial_comments
+      WHERE period_month = date_trunc('month', ${period}::date)::date
+        AND source = 'ai'
+        AND status = 'approved'
+        AND company_id IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    commentary = commentRow ? String(commentRow.comment) : null;
+  } catch { /* source/status columns not yet available */ }
+
   // Generate PDF
   const periodLabel = period.slice(0, 7);
   const generatedAt = new Date().toLocaleDateString("es-CL", { year: "numeric", month: "long", day: "numeric" });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const buffer = await renderToBuffer(
-    React.createElement(BoardPackPDF, { period: periodLabel, generatedAt, kpis, ranking, alerts, pnlLines, driversLy, driversBudget }) as any
+    React.createElement(BoardPackPDF, { period: periodLabel, generatedAt, kpis, ranking, alerts, pnlLines, driversLy, driversBudget, commentary }) as any
   );
 
   return new NextResponse(new Uint8Array(buffer), {

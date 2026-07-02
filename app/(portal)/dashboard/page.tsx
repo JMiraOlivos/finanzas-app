@@ -12,6 +12,7 @@ import { VarianceDriversPanel } from "@/components/dashboard/VarianceDriversPane
 import { CompanyBulletGrid } from "@/components/dashboard/CompanyBulletGrid";
 import { DataFreshnessBadge } from "@/components/dashboard/DataFreshnessBadge";
 import { AiExecutiveSummaryPanel } from "@/components/ai/AiExecutiveSummaryPanel";
+import { BoardCommentaryEditor } from "@/components/ai/BoardCommentaryEditor";
 import { ExplainButton } from "@/components/ai/ExplainButton";
 import { AiChatDrawer } from "@/components/ai/AiChatDrawer";
 import type { ChartsData } from "@/components/dashboard/DashboardCharts";
@@ -290,6 +291,9 @@ function DashboardContent() {
 
       {/* ── Análisis ejecutivo IA ── */}
       <AiExecutiveSummaryPanel period={period} companyIds={companyIdParam} />
+
+      {/* ── Comentario para el Directorio ── */}
+      <BoardCommentaryEditor period={period} companyIds={companyIdParam} />
 
       {/* ── Bloque 2: Alertas + Calidad de datos ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

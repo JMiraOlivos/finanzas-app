@@ -138,9 +138,9 @@ export async function buildFinancialContextPack(args: BuildArgs): Promise<Financ
     id:          String(c.id),
     companyId:   c.company_id ? String(c.company_id) : null,
     pnlLineCode: c.pnl_line_code ? String(c.pnl_line_code) : null,
-    body:        String(c.body),
+    body:        String(c.body ?? ""),
     createdAt:   String(c.created_at),
-    source:      "manual",
+    source:      (c.source as string | undefined) ?? "manual",
   }));
 
   // ── Period closes ─────────────────────────────────────────────────────────
@@ -323,23 +323,25 @@ async function fetchDataQuality(period: string, ids: string[] | null) {
 async function fetchComments(period: string, ids: string[] | null, pnlLineCode: string | null) {
   try {
     const monthStart = period.slice(0, 7) + "-01";
-    // financial_comments may have source column (added in PR 6 migration)
-    // source column is added in migration 021 (PR 6) — hardcode 'manual' until then
     return ids === null
       ? await sql`
-          SELECT id, company_id, pnl_line_code, body, created_at
+          SELECT id, company_id, pnl_line_code, comment AS body,
+                 COALESCE(source, 'manual') AS source, created_at
           FROM finanzas.financial_comments
           WHERE period_month = ${monthStart}::date
             AND (${pnlLineCode}::text IS NULL OR pnl_line_code = ${pnlLineCode ?? ""})
+            AND status IN ('draft', 'approved')
           ORDER BY created_at DESC
           LIMIT 20
         `
       : await sql`
-          SELECT id, company_id, pnl_line_code, body, created_at
+          SELECT id, company_id, pnl_line_code, comment AS body,
+                 COALESCE(source, 'manual') AS source, created_at
           FROM finanzas.financial_comments
           WHERE period_month = ${monthStart}::date
             AND (company_id = ANY(${ids}::uuid[]) OR company_id IS NULL)
             AND (${pnlLineCode}::text IS NULL OR pnl_line_code = ${pnlLineCode ?? ""})
+            AND status IN ('draft', 'approved')
           ORDER BY created_at DESC
           LIMIT 20
         `;

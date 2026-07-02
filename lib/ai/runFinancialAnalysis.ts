@@ -13,7 +13,7 @@ type AnalystJSON = {
   dataQualityCaveats: string[];
 };
 
-function buildContextText(pack: FinancialContextPack): string {
+export function buildContextText(pack: FinancialContextPack): string {
   const periodDate  = new Date(pack.scope.period + "T12:00:00Z");
   const periodLabel = periodDate.toLocaleDateString("es-CL", { month: "long", year: "numeric" });
 
