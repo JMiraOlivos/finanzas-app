@@ -59,7 +59,7 @@ jobs:
       - name: Mark dbt run completed
         if: success()
         run: |
-          curl -s -X POST "${{ secrets.APP_URL }}/api/internal/dbt-run-status" \
+          curl -w "\nHTTP %{http_code}" -X POST "${{ secrets.APP_URL }}/api/internal/dbt-run-status" \
             -H "Content-Type: application/json" \
             -H "x-internal-secret: ${{ secrets.INTERNAL_API_SECRET }}" \
             -d "{\"status\":\"completed\",\"githubRunId\":\"${{ github.run_id }}\"}"
@@ -67,7 +67,7 @@ jobs:
       - name: Mark dbt run failed
         if: failure()
         run: |
-          curl -s -X POST "${{ secrets.APP_URL }}/api/internal/dbt-run-status" \
+          curl -w "\nHTTP %{http_code}" -X POST "${{ secrets.APP_URL }}/api/internal/dbt-run-status" \
             -H "Content-Type: application/json" \
             -H "x-internal-secret: ${{ secrets.INTERNAL_API_SECRET }}" \
             -d "{\"status\":\"failed\",\"githubRunId\":\"${{ github.run_id }}\"}"

@@ -62,6 +62,8 @@ const MIGRATION_FILES = [
   // Fix: fn_pnl_ytd / fn_pnl_lmonth_ytd / fn_pnl_monthly now read from pnl_lines_versioned
   // so new lines added to a published structure version appear in EERR immediately after dbt run
   "032_fn_pnl_ytd_use_versioned_lines.sql",
+  // Fix: fn_pnl_ytd_comparison uses versioned lines + fct_pnl_monthly for LY (was v_pnl_base_monthly)
+  "033_fn_pnl_ytd_comparison_versioned.sql",
 ];
 
 async function run() {

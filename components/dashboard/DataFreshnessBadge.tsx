@@ -20,6 +20,10 @@ function label(run: DbtStatus): { text: string; dot: string } {
     return { text: "Último refresh falló", dot: "bg-ev-red" };
   }
   if (run.status === "triggered") {
+    const mins = minutesAgo(run.triggeredAt);
+    if (mins > 20) {
+      return { text: "Sin respuesta de dbt", dot: "bg-yellow-400" };
+    }
     return { text: "Actualizando marts…", dot: "bg-yellow-400 animate-pulse" };
   }
   // completed
