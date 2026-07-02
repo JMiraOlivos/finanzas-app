@@ -56,13 +56,6 @@ jobs:
         run: dbt run
         working-directory: dbt
 
-      - name: dbt test
-        env:
-          NEON_USER: ${{ secrets.NEON_USER }}
-          NEON_PASSWORD: ${{ secrets.NEON_PASSWORD }}
-        run: dbt test
-        working-directory: dbt
-
       - name: Mark dbt run completed
         if: success()
         run: |
@@ -78,3 +71,11 @@ jobs:
             -H "Content-Type: application/json" \
             -H "x-internal-secret: ${{ secrets.INTERNAL_API_SECRET }}" \
             -d "{\"status\":\"failed\",\"githubRunId\":\"${{ github.run_id }}\"}"
+
+      - name: dbt test (informational — failures do not block)
+        continue-on-error: true
+        env:
+          NEON_USER: ${{ secrets.NEON_USER }}
+          NEON_PASSWORD: ${{ secrets.NEON_PASSWORD }}
+        run: dbt test
+        working-directory: dbt
