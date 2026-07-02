@@ -47,7 +47,7 @@ export function AiExecutiveSummaryPanel({ period, companyIds }: Props) {
     fetch(`/api/ai/period-summary?${qs}`)
       .then((r) => r.json() as Promise<PeriodSummaryResponse | null>)
       .then((data) => {
-        if (data) { setResult(data); setState("success"); }
+        if (data) { setResult(data); setState("success"); setExpanded(true); }
         else       { setState("idle"); }
       })
       .catch(() => setState("idle"));
@@ -73,6 +73,7 @@ export function AiExecutiveSummaryPanel({ period, companyIds }: Props) {
         throw new Error(body.error ?? `HTTP ${res.status}`);
       }
       const data = await res.json() as PeriodSummaryResponse;
+      (data as Record<string, unknown>).generatedAt = new Date().toISOString();
       setResult(data);
       setState("success");
     } catch (e) {
