@@ -12,7 +12,7 @@ export async function GET() {
   }
 
   const rows = await sql`
-    SELECT triggered_at, trigger_source, status
+    SELECT triggered_at, trigger_source, status, completed_at, error_message, github_run_id
     FROM finanzas.dbt_run_history
     ORDER BY triggered_at DESC
     LIMIT 1
@@ -25,6 +25,9 @@ export async function GET() {
       triggeredAt:   rows[0].triggered_at,
       triggerSource: rows[0].trigger_source,
       status:        rows[0].status,
+      completedAt:   rows[0].completed_at   ?? null,
+      errorMessage:  rows[0].error_message  ?? null,
+      githubRunId:   rows[0].github_run_id  ?? null,
     },
   });
 }

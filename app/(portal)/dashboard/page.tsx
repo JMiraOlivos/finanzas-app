@@ -10,6 +10,7 @@ import { CompanyRanking, type CompanyRankingRow } from "@/components/dashboard/C
 import { ActiveFiltersBar } from "@/components/dashboard/ActiveFiltersBar";
 import { VarianceDriversPanel } from "@/components/dashboard/VarianceDriversPanel";
 import { CompanyBulletGrid } from "@/components/dashboard/CompanyBulletGrid";
+import { DataFreshnessBadge } from "@/components/dashboard/DataFreshnessBadge";
 import type { ChartsData } from "@/components/dashboard/DashboardCharts";
 
 const DashboardCharts = dynamic(
@@ -161,7 +162,10 @@ function DashboardContent() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-head text-ev-black">Dashboard Ejecutivo</h1>
-          <p className="text-xs font-body uppercase tracking-[0.1em] text-ev-gray3 mt-1">KPIs consolidados</p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-xs font-body uppercase tracking-[0.1em] text-ev-gray3">KPIs consolidados</p>
+            <DataFreshnessBadge />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <input
