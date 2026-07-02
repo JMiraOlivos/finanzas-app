@@ -13,6 +13,7 @@ import { CompanyBulletGrid } from "@/components/dashboard/CompanyBulletGrid";
 import { DataFreshnessBadge } from "@/components/dashboard/DataFreshnessBadge";
 import { AiExecutiveSummaryPanel } from "@/components/ai/AiExecutiveSummaryPanel";
 import { ExplainButton } from "@/components/ai/ExplainButton";
+import { AiChatDrawer } from "@/components/ai/AiChatDrawer";
 import type { ChartsData } from "@/components/dashboard/DashboardCharts";
 import type { CurrencyUnit } from "@/lib/formatters";
 
@@ -55,8 +56,9 @@ function DashboardContent() {
   const companyIdParam = sp.get("companyId");
   const metricParam    = sp.get("metric");
 
-  const [period, setPeriodState] = useState(periodParam ?? defaultPeriod());
-  const [unit,   setUnit]        = useState<CurrencyUnit>("millions");
+  const [period,    setPeriodState] = useState(periodParam ?? defaultPeriod());
+  const [unit,      setUnit]        = useState<CurrencyUnit>("millions");
+  const [chatOpen,  setChatOpen]    = useState(false);
 
   const [kpis,           setKpis]           = useState<KpiMetric[]>([]);
   const [chartsData,     setChartsData]     = useState<ChartsData | null>(null);
@@ -207,6 +209,12 @@ function DashboardContent() {
           >
             PDF ↓
           </a>
+          <button
+            onClick={() => setChatOpen(true)}
+            className="border border-ev-gray6 px-3 py-1.5 text-sm font-body text-ev-gray3 hover:text-ev-black hover:border-ev-black transition-colors flex items-center gap-1.5"
+          >
+            <span className="text-xs">✦</span> IA
+          </button>
         </div>
       </div>
 
@@ -313,6 +321,14 @@ function DashboardContent() {
       ) : chartsData ? (
         <DashboardCharts {...chartsData} />
       ) : null}
+
+      {/* ── Finance AI Chat Drawer ── */}
+      <AiChatDrawer
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        period={period}
+        companyIds={companyIdParam}
+      />
 
     </div>
   );

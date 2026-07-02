@@ -43,7 +43,7 @@ const sql = postgres(directUrl, {
 const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../sql");
 
 const MIGRATION_FILES = [
-  "018_ai_analysis_runs.sql",
+  "019_ai_chat_threads.sql",
 ];
 
 async function run() {
