@@ -382,8 +382,10 @@ export function PnlMappingsEditor({ version }: Props) {
                       ].join(" ")}
                     >
                       <td className="px-3 py-2.5">
-                        <span className="font-mono text-xs text-ev-black">{m.accountCode}</span>
-                        {m.accountName && <span className="ml-2 text-[11px] font-body text-ev-gray4">{m.accountName}</span>}
+                        <div className="font-body text-xs text-ev-black">
+                          {m.accountName ?? <span className="text-ev-gray4 italic">Sin nombre</span>}
+                        </div>
+                        <div className="font-mono text-[10px] text-ev-gray4">{m.accountCode}</div>
                       </td>
                       <td className="px-3 py-2.5 text-xs font-body text-ev-gray3">
                         {m.companyName ?? <span className="text-ev-gray5 italic">Global</span>}

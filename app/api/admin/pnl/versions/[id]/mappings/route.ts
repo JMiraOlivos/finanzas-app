@@ -56,10 +56,19 @@ export async function GET(request: NextRequest, { params }: Params) {
   const rows = await sql`
     SELECT
       m.id, m.company_id, c.name AS company_name,
-      m.account_code, m.account_name, m.pnl_line_code,
+      m.account_code,
+      COALESCE(m.account_name, je.account_name) AS account_name,
+      m.pnl_line_code,
       m.sign_multiplier, m.is_active, m.created_at, m.updated_at
     FROM finanzas.account_pnl_mappings_versioned m
     LEFT JOIN finanzas.companies c ON c.id = m.company_id
+    LEFT JOIN LATERAL (
+      SELECT account_name
+      FROM finanzas.journal_entries
+      WHERE account_code = m.account_code
+        AND account_name IS NOT NULL
+      LIMIT 1
+    ) je ON true
     WHERE m.structure_version_id = ${id}::uuid
     ORDER BY m.account_code, c.name NULLS FIRST
   `;
