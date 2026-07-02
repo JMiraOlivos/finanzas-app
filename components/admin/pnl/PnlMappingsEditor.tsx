@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { formatCurrency } from "@/lib/formatters";
+import { AiMappingSuggestionButton } from "./AiMappingSuggestionButton";
 
 type UnmappedAccount = {
   companyId: string;
@@ -208,22 +209,30 @@ export function PnlMappingsEditor({ version }: Props) {
                       {formatCurrency(a.totalAmount)}
                     </td>
                     <td className="px-3 py-2.5 text-xs font-body text-ev-gray4 text-right">{a.movementCount}</td>
-                    <td className="px-3 py-2.5 min-w-[220px]">
+                    <td className="px-3 py-2.5 min-w-[240px]">
                       {isSaved ? (
                         <span className="text-xs font-body text-ev-green">✓ Guardado</span>
                       ) : isDraft ? (
-                        <select
-                          value={selections[k] ?? ""}
-                          onChange={(e) => setSelections((p) => ({ ...p, [k]: e.target.value }))}
-                          className="w-full border border-ev-gray6 px-2 py-1 text-xs font-body focus:outline-none focus:ring-1 focus:ring-ev-black bg-white"
-                        >
-                          <option value="">Seleccionar línea…</option>
-                          {detailLines.map((l) => (
-                            <option key={l.code} value={l.code}>
-                              {"  ".repeat(l.level - 1)}{l.label}
-                            </option>
-                          ))}
-                        </select>
+                        <>
+                          <select
+                            value={selections[k] ?? ""}
+                            onChange={(e) => setSelections((p) => ({ ...p, [k]: e.target.value }))}
+                            className="w-full border border-ev-gray6 px-2 py-1 text-xs font-body focus:outline-none focus:ring-1 focus:ring-ev-black bg-white"
+                          >
+                            <option value="">Seleccionar línea…</option>
+                            {detailLines.map((l) => (
+                              <option key={l.code} value={l.code}>
+                                {"  ".repeat(l.level - 1)}{l.label}
+                              </option>
+                            ))}
+                          </select>
+                          <AiMappingSuggestionButton
+                            accountCode={a.accountCode}
+                            accountName={a.accountName}
+                            versionId={version.id}
+                            onSuggest={(code) => setSelections((p) => ({ ...p, [k]: code }))}
+                          />
+                        </>
                       ) : (
                         <span className="text-xs font-body text-ev-gray4">Sin mapear</span>
                       )}

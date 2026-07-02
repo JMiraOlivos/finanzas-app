@@ -53,6 +53,10 @@ const MIGRATION_FILES = [
   "026_pnl_structure_change_log.sql",
   "027_period_close_structure_version.sql",
   "028_pnl_structure_seed_current.sql",
+  // PR 9: Preview de impacto — función SQL que replica pipeline dbt parametrizada por version
+  "029_fn_pnl_ytd_for_structure_version.sql",
+  // PR 11: Agrega p_company_ids e is_bold/is_highlighted a la función
+  "030_fn_pnl_ytd_for_structure_version_v2.sql",
 ];
 
 async function run() {

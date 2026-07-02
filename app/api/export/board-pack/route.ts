@@ -260,6 +260,17 @@ export async function GET(request: NextRequest) {
 
   const allowedIds = await getAllowedCompanyIds(user.id, user.role);
 
+  // For published periods: use the P&L structure version that was active at close time
+  // so historical board packs remain reproducible after structure changes.
+  const [periodCloseRow] = await sql`
+    SELECT pnl_structure_version_id
+    FROM finanzas.financial_period_closes
+    WHERE period_month = date_trunc('month', ${period}::date)::date
+      AND status = 'published'
+      AND pnl_structure_version_id IS NOT NULL
+  `;
+  const pinnedVersionId = (periodCloseRow?.pnl_structure_version_id as string) ?? null;
+
   const n = (v: unknown) => (v !== null && v !== undefined ? Number(v) : null);
   const pct = (a: number | null, b: number | null) =>
     a !== null && b ? (a - b) / Math.abs(b) : null;
@@ -322,10 +333,27 @@ export async function GET(request: NextRequest) {
           WHERE c.is_active = TRUE AND c.id = ANY(${allowedIds}::uuid[])
           ORDER BY c.name`,
 
-    // P&L table: fn_pnl_ytd now reads from fct_pnl_monthly internally (012_pnl_functions_v2.sql)
-    allowedIds === null
-      ? sql`SELECT line_code, line_label, line_type, is_bold, SUM(amount) AS amount FROM finanzas.fn_pnl_ytd(${period}::date, NULL) GROUP BY line_code, line_label, line_type, is_bold, sort_order ORDER BY sort_order`
-      : sql`SELECT line_code, line_label, line_type, is_bold, SUM(amount) AS amount FROM finanzas.fn_pnl_ytd(${period}::date, ${allowedIds}::uuid[]) GROUP BY line_code, line_label, line_type, is_bold, sort_order ORDER BY sort_order`,
+    // P&L table: use pinned structure version for published periods (reproducibility),
+    // otherwise fall back to fn_pnl_ytd which reads the dbt mart.
+    pinnedVersionId
+      ? allowedIds === null
+          ? sql`
+              SELECT pnl_line_code AS line_code, pnl_line_label AS line_label,
+                     line_type, is_bold, COALESCE(amount_ytd, 0) AS amount
+              FROM finanzas.fn_pnl_ytd_for_structure_version(
+                ${period}::date, ${pinnedVersionId}::uuid
+              )
+              ORDER BY sort_order`
+          : sql`
+              SELECT pnl_line_code AS line_code, pnl_line_label AS line_label,
+                     line_type, is_bold, COALESCE(amount_ytd, 0) AS amount
+              FROM finanzas.fn_pnl_ytd_for_structure_version(
+                ${period}::date, ${pinnedVersionId}::uuid, ${allowedIds}::uuid[]
+              )
+              ORDER BY sort_order`
+      : allowedIds === null
+          ? sql`SELECT line_code, line_label, line_type, is_bold, SUM(amount) AS amount FROM finanzas.fn_pnl_ytd(${period}::date, NULL) GROUP BY line_code, line_label, line_type, is_bold, sort_order ORDER BY sort_order`
+          : sql`SELECT line_code, line_label, line_type, is_bold, SUM(amount) AS amount FROM finanzas.fn_pnl_ytd(${period}::date, ${allowedIds}::uuid[]) GROUP BY line_code, line_label, line_type, is_bold, sort_order ORDER BY sort_order`,
 
     // Drivers vs LY
     allowedIds === null

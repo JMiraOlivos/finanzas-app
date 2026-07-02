@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { PublishPnlVersionDialog } from "./PublishPnlVersionDialog";
+import { RollbackPnlVersionDialog } from "./RollbackPnlVersionDialog";
 
 type PnlVersion = {
   id: string;
@@ -35,9 +36,10 @@ type CreateDialogState = { open: false } | { open: true; mode: "new" | "duplicat
 export function PnlVersionList({ onSelectVersion }: Props) {
   const [versions, setVersions] = useState<PnlVersion[]>([]);
   const [loading,  setLoading]  = useState(true);
-  const [dialog,        setDialog]        = useState<CreateDialogState>({ open: false });
-  const [publishTarget, setPublishTarget] = useState<PnlVersion | null>(null);
-  const [archiving,     setArchiving]     = useState<string | null>(null);
+  const [dialog,          setDialog]          = useState<CreateDialogState>({ open: false });
+  const [publishTarget,   setPublishTarget]   = useState<PnlVersion | null>(null);
+  const [rollbackTarget,  setRollbackTarget]  = useState<PnlVersion | null>(null);
+  const [archiving,       setArchiving]       = useState<string | null>(null);
   const [newName,       setNewName]       = useState("");
   const [newDesc,       setNewDesc]       = useState("");
   const [saving,        setSaving]        = useState(false);
@@ -203,6 +205,14 @@ export function PnlVersionList({ onSelectVersion }: Props) {
                         </button>
                       </>
                     )}
+                    {v.status === "archived" && (
+                      <button
+                        onClick={() => setRollbackTarget(v)}
+                        className="text-xs font-body px-2.5 py-0.5 border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors"
+                      >
+                        Restaurar
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -217,6 +227,15 @@ export function PnlVersionList({ onSelectVersion }: Props) {
           versionName={publishTarget.name}
           onClose={() => setPublishTarget(null)}
           onPublished={() => { setPublishTarget(null); void load(); }}
+        />
+      )}
+
+      {rollbackTarget && (
+        <RollbackPnlVersionDialog
+          sourceVersionId={rollbackTarget.id}
+          sourceVersionName={rollbackTarget.name}
+          onClose={() => setRollbackTarget(null)}
+          onRolledBack={() => { setRollbackTarget(null); void load(); }}
         />
       )}
 
