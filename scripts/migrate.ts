@@ -57,6 +57,8 @@ const MIGRATION_FILES = [
   "029_fn_pnl_ytd_for_structure_version.sql",
   // PR 11: Agrega p_company_ids e is_bold/is_highlighted a la función
   "030_fn_pnl_ytd_for_structure_version_v2.sql",
+  // Fix: unique indexes must scope to is_active=true to allow deactivate+insert upsert pattern
+  "031_fix_apmv_unique_indexes.sql",
 ];
 
 async function run() {
