@@ -73,3 +73,71 @@ models:
         tests: [not_null]
       - name: component_line_code
         tests: [not_null]
+
+  # ── PR 2: staging de tablas versionadas (P&L Builder) ─────────────────────
+
+  - name: stg_pnl_structure_versions
+    description: "Todas las versiones de estructura P&L (draft, published, archived)"
+    columns:
+      - name: id
+        tests: [unique, not_null]
+      - name: name
+        tests: [not_null]
+      - name: status
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['draft', 'published', 'archived']
+      - name: is_active
+        tests: [not_null]
+
+  - name: stg_active_pnl_lines
+    description: "Líneas P&L de la versión activa publicada. Equivalente versionado de stg_pnl_lines."
+    columns:
+      - name: id
+        tests: [unique, not_null]
+      - name: structure_version_id
+        tests: [not_null]
+      - name: code
+        tests: [unique, not_null]
+      - name: line_type
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['detail', 'subtotal', 'calculated']
+
+  - name: stg_active_account_pnl_mappings
+    description: "Mappings cuenta → pnl_line_code de la versión activa. company_id NULL = global."
+    columns:
+      - name: id
+        tests: [unique, not_null]
+      - name: structure_version_id
+        tests: [not_null]
+      - name: account_code
+        tests: [not_null]
+      - name: pnl_line_code
+        tests: [not_null]
+      - name: sign_multiplier
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, -1]
+
+  - name: stg_active_pnl_formula_components
+    description: "Componentes de fórmulas de la versión activa. operator es INTEGER (1/-1)."
+    columns:
+      - name: structure_version_id
+        tests: [not_null]
+      - name: formula_key
+        tests: [not_null]
+      - name: component_line_code
+        tests: [not_null]
+      - name: operator
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, -1]

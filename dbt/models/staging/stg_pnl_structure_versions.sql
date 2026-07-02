@@ -1,0 +1,19 @@
+select
+    id,
+    name,
+    description,
+    status,
+    is_active,
+    effective_from,
+    effective_to,
+    source_version_id,
+    created_by,
+    created_at,
+    updated_by,
+    updated_at,
+    published_by,
+    published_at,
+    archived_by,
+    archived_at,
+    notes
+from {{ source('finanzas', 'pnl_structure_versions') }}

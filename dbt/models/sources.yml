@@ -129,3 +129,71 @@ sources:
               - accepted_values:
                   arguments:
                     values: ['+', '-']
+
+      # ── PR 1: tablas versionadas (P&L Builder) ──────────────────────────────
+
+      - name: pnl_structure_versions
+        description: "Versiones de estructura P&L (draft → published → archived). Una sola activa a la vez."
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: name
+            tests: [not_null]
+          - name: status
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['draft', 'published', 'archived']
+          - name: is_active
+            tests: [not_null]
+
+      - name: pnl_lines_versioned
+        description: "Líneas P&L asociadas a una versión de estructura. code único dentro de version."
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: structure_version_id
+            tests: [not_null]
+          - name: code
+            tests: [not_null]
+          - name: line_type
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['detail', 'subtotal', 'calculated']
+
+      - name: account_pnl_mappings_versioned
+        description: "Mappings cuenta → línea P&L versionados. pnl_line_code es TEXT para estabilidad entre versiones."
+        columns:
+          - name: id
+            tests: [unique, not_null]
+          - name: structure_version_id
+            tests: [not_null]
+          - name: account_code
+            tests: [not_null]
+          - name: pnl_line_code
+            tests: [not_null]
+          - name: sign_multiplier
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [1, -1]
+
+      - name: pnl_formula_components_versioned
+        description: "Componentes de fórmulas versionados. operator es INTEGER (1/-1)."
+        columns:
+          - name: structure_version_id
+            tests: [not_null]
+          - name: formula_key
+            tests: [not_null]
+          - name: component_line_code
+            tests: [not_null]
+          - name: operator
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: [1, -1]
