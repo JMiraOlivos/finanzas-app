@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FinancialColumnGroup, FinancialRow } from "@/lib/eerr";
-import { formatFinancialValue } from "@/lib/formatters";
+import { formatFinancialValue, type CurrencyUnit } from "@/lib/formatters";
 
 const EXPENSE_CODES = new Set([
   "GASTOS_VARIABLES", "RRHH", "MARKETING", "GASTOS_ADMIN",
@@ -22,6 +22,7 @@ type Props = {
   columnGroups: FinancialColumnGroup[];
   rows: FinancialRow[];
   loading?: boolean;
+  unit?: CurrencyUnit;
   onCellClick?: (params: CellClickParams) => void;
 };
 
@@ -31,6 +32,7 @@ export function FinancialStatementTable({
   columnGroups,
   rows,
   loading = false,
+  unit = "full",
   onCellClick,
 }: Props) {
   const [collapsedCodes, setCollapsedCodes] = useState<Set<string>>(new Set());
@@ -178,7 +180,7 @@ export function FinancialStatementTable({
                           onCellClick?.({ row, companyId: col.groupId, columnId: col.id });
                         }}
                       >
-                        {value !== null ? formatFinancialValue(value, col.type) : (
+                        {value !== null ? formatFinancialValue(value, col.type, unit) : (
                           <span className="text-ev-gray7">—</span>
                         )}
                       </td>

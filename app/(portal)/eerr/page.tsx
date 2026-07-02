@@ -6,6 +6,7 @@ import { DrillDownDrawer } from "@/components/financial/DrillDownDrawer";
 import { EerrFilters } from "@/components/financial/EerrFilters";
 import { FinancialStatementPayload, FinancialRow } from "@/lib/eerr";
 import { type EerrMode } from "@/components/financial/EerrFilters";
+import { type CurrencyUnit } from "@/lib/formatters";
 
 type Company = { id: string; name: string };
 
@@ -21,6 +22,7 @@ export default function EerrPage() {
   const [selectedIds,  setSelectedIds]  = useState<string[]>([]);
   const [period,       setPeriod]       = useState(defaultPeriod);
   const [mode,         setMode]         = useState<EerrMode>("ytd");
+  const [unit,         setUnit]         = useState<CurrencyUnit>("millions");
   const [payload,      setPayload]      = useState<FinancialStatementPayload | null>(null);
   const [loading,      setLoading]      = useState(false);
 
@@ -71,14 +73,32 @@ export default function EerrPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-head text-ev-black">Estado de Resultados</h1>
-        <button
-          onClick={handleExcel}
-          disabled={!payload?.rows.length}
-          className="text-xs font-body px-3 py-1.5 border border-ev-gray6 text-ev-gray2
-                     hover:bg-ev-beige2 disabled:opacity-40 transition-colors"
-        >
-          Exportar Excel
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Currency unit toggle */}
+          <div className="flex border border-ev-gray6 overflow-hidden text-xs">
+            {([ ["full", "#"], ["thousands", "M"], ["millions", "MM"] ] as [CurrencyUnit, string][]).map(([u, label], i) => (
+              <button
+                key={u}
+                onClick={() => setUnit(u)}
+                className={[
+                  "px-2.5 py-1.5 font-body font-medium",
+                  i > 0 ? "border-l border-ev-gray6" : "",
+                  unit === u ? "bg-ev-black text-white" : "bg-white text-ev-gray3 hover:bg-ev-beige2 hover:text-ev-black",
+                ].join(" ")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handleExcel}
+            disabled={!payload?.rows.length}
+            className="text-xs font-body px-3 py-1.5 border border-ev-gray6 text-ev-gray2
+                       hover:bg-ev-beige2 disabled:opacity-40 transition-colors"
+          >
+            Exportar Excel
+          </button>
+        </div>
       </div>
 
       <div className="border border-ev-gray7 bg-white overflow-hidden">
@@ -98,6 +118,7 @@ export default function EerrPage() {
           columnGroups={payload?.columnGroups ?? []}
           rows={payload?.rows ?? []}
           loading={loading}
+          unit={unit}
           onCellClick={(p) => handleCellClick({ row: p.row, companyId: p.companyId })}
         />
       </div>

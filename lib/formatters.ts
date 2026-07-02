@@ -55,10 +55,11 @@ export function formatPercentage(value: number | null | undefined): string {
 
 export function formatFinancialValue(
   value: number | null | undefined,
-  type: "currency" | "percentage" | "number"
+  type: "currency" | "percentage" | "number",
+  unit: CurrencyUnit = "full",
 ): string {
   if (type === "percentage") return formatPercentage(value);
-  if (type === "currency") return formatCurrency(value);
+  if (type === "currency") return formatCurrencyUnit(value, unit);
   if (value === null || value === undefined) return "";
   return String(value);
 }
