@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { PublishPnlVersionDialog } from "./PublishPnlVersionDialog";
 
 type PnlVersion = {
   id: string;
@@ -34,11 +35,13 @@ type CreateDialogState = { open: false } | { open: true; mode: "new" | "duplicat
 export function PnlVersionList({ onSelectVersion }: Props) {
   const [versions, setVersions] = useState<PnlVersion[]>([]);
   const [loading,  setLoading]  = useState(true);
-  const [dialog,   setDialog]   = useState<CreateDialogState>({ open: false });
-  const [newName,  setNewName]  = useState("");
-  const [newDesc,  setNewDesc]  = useState("");
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState<string | null>(null);
+  const [dialog,        setDialog]        = useState<CreateDialogState>({ open: false });
+  const [publishTarget, setPublishTarget] = useState<PnlVersion | null>(null);
+  const [archiving,     setArchiving]     = useState<string | null>(null);
+  const [newName,       setNewName]       = useState("");
+  const [newDesc,       setNewDesc]       = useState("");
+  const [saving,        setSaving]        = useState(false);
+  const [error,         setError]         = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,6 +94,20 @@ export function PnlVersionList({ onSelectVersion }: Props) {
       }
     }
     setSaving(false);
+  }
+
+  async function handleArchive(v: PnlVersion) {
+    if (!confirm(`¿Archivar el borrador "${v.name}"? Esta acción no se puede deshacer.`)) return;
+    setArchiving(v.id);
+    setError(null);
+    const res = await fetch(`/api/admin/pnl/versions/${v.id}/archive`, { method: "POST" });
+    if (!res.ok) {
+      const d = await res.json() as { error?: string };
+      setError(d.error ?? "Error al archivar");
+    } else {
+      await load();
+    }
+    setArchiving(null);
   }
 
   function fmtDate(iso: string | null) {
@@ -156,7 +173,7 @@ export function PnlVersionList({ onSelectVersion }: Props) {
                 <td className="px-4 py-3 text-xs font-body text-ev-gray4">{fmtDate(v.createdAt)}</td>
                 <td className="px-4 py-3 text-xs font-body text-ev-gray4">{fmtDate(v.publishedAt)}</td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <button
                       onClick={() => onSelectVersion(v)}
                       className="text-xs font-body text-ev-gray3 hover:text-ev-black underline"
@@ -169,6 +186,23 @@ export function PnlVersionList({ onSelectVersion }: Props) {
                     >
                       Duplicar
                     </button>
+                    {v.status === "draft" && (
+                      <>
+                        <button
+                          onClick={() => setPublishTarget(v)}
+                          className="text-xs font-body px-2.5 py-0.5 border border-ev-green text-ev-green hover:bg-green-50 transition-colors"
+                        >
+                          Publicar
+                        </button>
+                        <button
+                          onClick={() => handleArchive(v)}
+                          disabled={archiving === v.id}
+                          className="text-xs font-body text-ev-gray4 hover:text-ev-black disabled:opacity-40 underline"
+                        >
+                          {archiving === v.id ? "..." : "Archivar"}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -176,6 +210,15 @@ export function PnlVersionList({ onSelectVersion }: Props) {
           </tbody>
         </table>
       </div>
+
+      {publishTarget && (
+        <PublishPnlVersionDialog
+          versionId={publishTarget.id}
+          versionName={publishTarget.name}
+          onClose={() => setPublishTarget(null)}
+          onPublished={() => { setPublishTarget(null); void load(); }}
+        />
+      )}
 
       {dialog.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
