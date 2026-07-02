@@ -72,23 +72,23 @@ export async function loadBudgetFile(params: {
   const accountNames = [...new Set(parsed.rows.map((r) => r.accountName))];
   const companyIds   = [...new Set(Object.values(Object.fromEntries(companyMap)))];
 
-  const mappingRows = await sql<{ account_name: string; company_id: string | null; pnl_line_id: string }[]>`
-    SELECT account_name, company_id, pnl_line_id
+  const mappingRows = await sql<{ account_name: string; company_id: string | null; pnl_line_code: string }[]>`
+    SELECT account_name, company_id, pnl_line_code
     FROM finanzas.budget_account_mappings
     WHERE is_active = TRUE
       AND LOWER(account_name) = ANY(${accountNames.map((n) => n.toLowerCase())})
       AND (company_id IS NULL OR company_id = ANY(${companyIds}::uuid[]))
   `;
 
-  // Build mapping: (accountNameLower, companyId) → pnlLineId
+  // Build mapping: (accountNameLower, companyId) → pnlLineCode
   // Company-specific mapping takes priority over global (company_id IS NULL)
   const mappingKey = (name: string, cid: string | null) => `${name.toLowerCase()}|${cid ?? "__global__"}`;
   const resolvedMap = new Map<string, string>();
   for (const m of mappingRows) {
-    if (m.company_id === null) resolvedMap.set(mappingKey(m.account_name, null), m.pnl_line_id);
+    if (m.company_id === null) resolvedMap.set(mappingKey(m.account_name, null), m.pnl_line_code);
   }
   for (const m of mappingRows) {
-    if (m.company_id !== null) resolvedMap.set(mappingKey(m.account_name, m.company_id), m.pnl_line_id);
+    if (m.company_id !== null) resolvedMap.set(mappingKey(m.account_name, m.company_id), m.pnl_line_code);
   }
 
   function resolveMapping(accountName: string, companyId: string): string | null {
@@ -179,8 +179,8 @@ export async function loadBudgetFile(params: {
           const batch = values.slice(i, i + BATCH2);
           await tx`
             INSERT INTO finanzas.budget_monthly
-              ${tx(batch, ["version_id", "company_id", "pnl_line_id", "period_month", "amount"])}
-            ON CONFLICT (version_id, company_id, pnl_line_id, period_month)
+              ${tx(batch, ["version_id", "company_id", "pnl_line_code", "period_month", "amount"])}
+            ON CONFLICT (version_id, company_id, pnl_line_code, period_month)
             DO UPDATE SET amount = EXCLUDED.amount
           `;
         }
@@ -235,23 +235,23 @@ export function buildBudgetMonthlyValues(
   companyMap: Map<string, string>,
   versionMap: Map<string, string>,
   resolveMapping: (accountName: string, companyId: string) => string | null
-): Array<{ version_id: string; company_id: string; pnl_line_id: string; period_month: string; amount: number }> {
-  const agg = new Map<string, { version_id: string; company_id: string; pnl_line_id: string; period_month: string; amount: number }>();
+): Array<{ version_id: string; company_id: string; pnl_line_code: string; period_month: string; amount: number }> {
+  const agg = new Map<string, { version_id: string; company_id: string; pnl_line_code: string; period_month: string; amount: number }>();
 
   for (const row of rows) {
     const companyId = row.company_id ?? companyMap.get(row.companyName!.toLowerCase());
     if (!companyId) continue;
-    const pnlLineId = resolveMapping(row.accountName, companyId);
-    if (!pnlLineId) continue;
+    const pnlLineCode = resolveMapping(row.accountName, companyId);
+    if (!pnlLineCode) continue;
     const year      = parseInt(row.periodMonth.slice(0, 4), 10);
     const versionId = versionMap.get(`${companyId}:${year}`);
     if (!versionId) continue;
-    const key       = `${versionId}|${companyId}|${pnlLineId}|${row.periodMonth}`;
+    const key       = `${versionId}|${companyId}|${pnlLineCode}|${row.periodMonth}`;
     const existing  = agg.get(key);
     if (existing) {
       existing.amount += row.amount;
     } else {
-      agg.set(key, { version_id: versionId, company_id: companyId, pnl_line_id: pnlLineId, period_month: row.periodMonth, amount: row.amount });
+      agg.set(key, { version_id: versionId, company_id: companyId, pnl_line_code: pnlLineCode, period_month: row.periodMonth, amount: row.amount });
     }
   }
 

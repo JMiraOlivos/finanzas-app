@@ -24,11 +24,10 @@ actual_monthly as (
 budget_monthly as (
     select
         b.company_id,
-        pl.code        as pnl_line_code,
+        b.pnl_line_code,
         b.period_month,
         b.amount
     from {{ ref('stg_budget_monthly') }} b
-    join {{ ref('stg_pnl_lines') }} pl on pl.id = b.pnl_line_id
     where b.version_is_active = true
 ),
 

@@ -67,7 +67,10 @@ export async function GET(request: NextRequest) {
         FROM finanzas.budget_monthly bm
         JOIN finanzas.budget_versions bv ON bm.version_id = bv.id AND bv.is_active = TRUE
         JOIN finanzas.companies  c  ON c.id  = bm.company_id
-        JOIN finanzas.pnl_lines  pl ON pl.id = bm.pnl_line_id
+        JOIN finanzas.pnl_lines_versioned pl
+          ON pl.code = bm.pnl_line_code
+          AND pl.structure_version_id = (SELECT id FROM finanzas.pnl_structure_versions WHERE is_active = true LIMIT 1)
+          AND pl.is_active = true
         WHERE bm.period_month >= date_trunc('year', ${period}::date)::date
           AND bm.period_month <= ${period}::date
         ORDER BY c.name, pl.sort_order, bm.period_month
@@ -83,7 +86,10 @@ export async function GET(request: NextRequest) {
         FROM finanzas.budget_monthly bm
         JOIN finanzas.budget_versions bv ON bm.version_id = bv.id AND bv.is_active = TRUE
         JOIN finanzas.companies  c  ON c.id  = bm.company_id
-        JOIN finanzas.pnl_lines  pl ON pl.id = bm.pnl_line_id
+        JOIN finanzas.pnl_lines_versioned pl
+          ON pl.code = bm.pnl_line_code
+          AND pl.structure_version_id = (SELECT id FROM finanzas.pnl_structure_versions WHERE is_active = true LIMIT 1)
+          AND pl.is_active = true
         WHERE bm.period_month >= date_trunc('year', ${period}::date)::date
           AND bm.period_month <= ${period}::date
           AND bm.company_id = ANY(${allowedIds}::uuid[])

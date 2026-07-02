@@ -25,9 +25,7 @@ export async function GET(request: NextRequest) {
       s.account_name,
       s.company_id,
       c.name AS company_name,
-      bam.pnl_line_id,
-      pl.code  AS pnl_line_code,
-      pl.label AS pnl_line_label
+      bam.pnl_line_code
     FROM (
       SELECT DISTINCT account_name, company_id
       FROM finanzas.budget_staging
@@ -38,7 +36,6 @@ export async function GET(request: NextRequest) {
       ON bam.is_active = TRUE
       AND LOWER(bam.account_name) = LOWER(s.account_name)
       AND (bam.company_id = s.company_id OR bam.company_id IS NULL)
-    LEFT JOIN finanzas.pnl_lines pl ON pl.id = bam.pnl_line_id
     ORDER BY s.company_id, s.account_name
   `;
 
@@ -46,7 +43,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/budget/mappings
-// Body: { versionId: string, mappings: { accountName: string, pnlLineId: string, companyId: string }[] }
+// Body: { versionId: string, mappings: { accountName: string, pnlLineCode: string, companyId: string }[] }
 // Saves mappings + applies them to staging → commits to budget_monthly.
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -59,7 +56,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json() as {
     versionId: string;
-    mappings: { accountName: string; pnlLineId: string; companyId: string }[];
+    mappings: { accountName: string; pnlLineCode: string; companyId: string }[];
   };
 
   if (!body.versionId || !Array.isArray(body.mappings) || body.mappings.length === 0) {
@@ -72,15 +69,15 @@ export async function POST(request: NextRequest) {
       for (const m of body.mappings) {
         await tx`
           INSERT INTO finanzas.budget_account_mappings
-            (account_name, company_id, pnl_line_id, created_by)
+            (account_name, company_id, pnl_line_code, created_by)
           VALUES
-            (${m.accountName}, ${m.companyId}::uuid, ${m.pnlLineId}::uuid, ${user.id}::uuid)
+            (${m.accountName}, ${m.companyId}::uuid, ${m.pnlLineCode}, ${user.id}::uuid)
           ON CONFLICT (account_name, company_id)
           DO UPDATE SET
-            pnl_line_id = EXCLUDED.pnl_line_id,
-            is_active   = TRUE,
-            created_by  = EXCLUDED.created_by,
-            created_at  = now()
+            pnl_line_code = EXCLUDED.pnl_line_code,
+            is_active     = TRUE,
+            created_by    = EXCLUDED.created_by,
+            created_at    = now()
         `;
       }
 
@@ -91,8 +88,8 @@ export async function POST(request: NextRequest) {
       `;
       const companyIds = stagingCompanies.map((r) => r.company_id);
 
-      const allMappings = await tx<{ account_name: string; company_id: string | null; pnl_line_id: string }[]>`
-        SELECT account_name, company_id, pnl_line_id
+      const allMappings = await tx<{ account_name: string; company_id: string | null; pnl_line_code: string }[]>`
+        SELECT account_name, company_id, pnl_line_code
         FROM finanzas.budget_account_mappings
         WHERE is_active = TRUE
           AND (company_id IS NULL OR company_id = ANY(${companyIds}::uuid[]))
@@ -101,8 +98,8 @@ export async function POST(request: NextRequest) {
       const globalMap   = new Map<string, string>();
       const companyMap2 = new Map<string, string>();
       for (const m of allMappings) {
-        if (m.company_id === null) globalMap.set(m.account_name.toLowerCase(), m.pnl_line_id);
-        else companyMap2.set(`${m.account_name.toLowerCase()}|${m.company_id}`, m.pnl_line_id);
+        if (m.company_id === null) globalMap.set(m.account_name.toLowerCase(), m.pnl_line_code);
+        else companyMap2.set(`${m.account_name.toLowerCase()}|${m.company_id}`, m.pnl_line_code);
       }
       const resolve = (name: string, cid: string) =>
         companyMap2.get(`${name.toLowerCase()}|${cid}`) ??
@@ -147,8 +144,8 @@ export async function POST(request: NextRequest) {
         const batch = values.slice(i, i + BATCH);
         await tx`
           INSERT INTO finanzas.budget_monthly
-            ${tx(batch, ["version_id", "company_id", "pnl_line_id", "period_month", "amount"])}
-          ON CONFLICT (version_id, company_id, pnl_line_id, period_month)
+            ${tx(batch, ["version_id", "company_id", "pnl_line_code", "period_month", "amount"])}
+          ON CONFLICT (version_id, company_id, pnl_line_code, period_month)
           DO UPDATE SET amount = EXCLUDED.amount
         `;
       }

@@ -64,6 +64,10 @@ const MIGRATION_FILES = [
   "032_fn_pnl_ytd_use_versioned_lines.sql",
   // Fix: fn_pnl_ytd_comparison uses versioned lines + fct_pnl_monthly for LY (was v_pnl_base_monthly)
   "033_fn_pnl_ytd_comparison_versioned.sql",
+  // Migrate budget_monthly + budget_account_mappings from pnl_line_id UUID FK to pnl_line_code TEXT
+  "034_budget_pnl_line_code.sql",
+  // Remove bridge JOIN to legacy pnl_lines in fn_pnl_ytd_comparison budget_all CTE
+  "035_fn_pnl_ytd_comparison_clean_budget.sql",
 ];
 
 async function run() {

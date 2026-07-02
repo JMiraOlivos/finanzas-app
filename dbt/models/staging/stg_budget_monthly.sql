@@ -2,7 +2,7 @@ select
     bm.id,
     bm.version_id,
     bm.company_id,
-    bm.pnl_line_id,
+    bm.pnl_line_code,
     bm.period_month,
     bm.amount,
     bv.year,

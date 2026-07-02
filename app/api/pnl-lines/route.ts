@@ -8,9 +8,13 @@ export async function GET() {
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const rows = await sql`
-    SELECT id, code, label, line_type, parent_code, sort_order
-    FROM finanzas.pnl_lines
-    WHERE show_in_report = TRUE
+    SELECT code, label, line_type, parent_code, sort_order
+    FROM finanzas.pnl_lines_versioned
+    WHERE structure_version_id = (
+      SELECT id FROM finanzas.pnl_structure_versions WHERE is_active = true LIMIT 1
+    )
+      AND is_active = true
+      AND show_in_report = TRUE
       AND line_type IN ('detail', 'subtotal')
     ORDER BY sort_order
   `;

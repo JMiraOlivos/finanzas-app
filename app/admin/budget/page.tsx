@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 
 type PnlLine = {
-  id: string;
   code: string;
   label: string;
   line_type: string;
@@ -32,7 +31,7 @@ export default function BudgetPage() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [error,     setError]     = useState<string | null>(null);
   const [pnlLines,  setPnlLines]  = useState<PnlLine[]>([]);
-  // accountName → pnlLineId
+  // accountName → pnlLineCode
   const [selections, setSelections] = useState<Record<string, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -105,14 +104,14 @@ export default function BudgetPage() {
 
     // Build one mapping per (accountName, companyId) pair
     const seen = new Set<string>();
-    const mappings: { accountName: string; pnlLineId: string; companyId: string }[] = [];
+    const mappings: { accountName: string; pnlLineCode: string; companyId: string }[] = [];
     for (const row of companyRows) {
       const key = `${row.account_name}|${row.company_id}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const pnlLineId = selections[row.account_name];
-      if (pnlLineId) {
-        mappings.push({ accountName: row.account_name, pnlLineId, companyId: row.company_id });
+      const pnlLineCode = selections[row.account_name];
+      if (pnlLineCode) {
+        mappings.push({ accountName: row.account_name, pnlLineCode, companyId: row.company_id });
       }
     }
 
@@ -257,7 +256,7 @@ export default function BudgetPage() {
                         >
                           <option value="">— seleccionar —</option>
                           {pnlLines.map((pl) => (
-                            <option key={pl.id} value={pl.id}>
+                            <option key={pl.code} value={pl.code}>
                               {pl.label} ({pl.code})
                             </option>
                           ))}
