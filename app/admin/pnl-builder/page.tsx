@@ -4,8 +4,9 @@ import { useState } from "react";
 import { PnlVersionList } from "@/components/admin/pnl/PnlVersionList";
 import { PnlStructureEditor } from "@/components/admin/pnl/PnlStructureEditor";
 import { PnlMappingsEditor } from "@/components/admin/pnl/PnlMappingsEditor";
+import { PnlFormulaEditor } from "@/components/admin/pnl/PnlFormulaEditor";
 
-type Tab = "versions" | "structure" | "mappings";
+type Tab = "versions" | "structure" | "mappings" | "formulas";
 
 type SelectedVersion = {
   id: string;
@@ -70,11 +71,12 @@ export default function PnlBuilderPage() {
 
       {/* Tabs */}
       <div className="flex items-center gap-0 border-b border-ev-gray7">
-        {(["versions", "structure", "mappings"] as Tab[]).map((t) => {
+        {(["versions", "structure", "mappings", "formulas"] as Tab[]).map((t) => {
           const labels: Record<Tab, string> = {
             versions:  "Versiones",
             structure: "Estructura",
             mappings:  "Mappings",
+            formulas:  "Fórmulas",
           };
           return (
             <button
@@ -119,6 +121,16 @@ export default function PnlBuilderPage() {
           <div className="space-y-3">
             <VersionBadge />
             <PnlMappingsEditor version={selectedVersion} />
+          </div>
+        ) : <NoVersionSelected />
+      )}
+
+      {/* Tab: Fórmulas */}
+      {tab === "formulas" && (
+        selectedVersion ? (
+          <div className="space-y-3">
+            <VersionBadge />
+            <PnlFormulaEditor version={selectedVersion} />
           </div>
         ) : <NoVersionSelected />
       )}
