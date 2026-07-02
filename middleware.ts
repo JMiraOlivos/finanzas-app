@@ -11,7 +11,9 @@ export default auth((req) => {
   const isAuthPage = nextUrl.pathname.startsWith("/login");
   const isApiAuth  = nextUrl.pathname.startsWith("/api/auth");
 
-  if (isApiAuth) return NextResponse.next();
+  const isApiInternal = nextUrl.pathname.startsWith("/api/internal");
+
+  if (isApiAuth || isApiInternal) return NextResponse.next();
 
   if (!isLoggedIn && !isAuthPage) {
     const loginUrl = new URL("/login", nextUrl.origin);
