@@ -9,17 +9,25 @@ export type ValidationError = {
 export type ValidationResult = {
   valid: boolean;
   errors: ValidationError[];
+  warnings: ValidationError[];
 };
 
 export async function validatePnlStructure(versionId: string): Promise<ValidationResult> {
   const errors: ValidationError[] = [];
+  const warnings: ValidationError[] = [];
 
   const lines = await sql`
-    SELECT id, code, parent_code, line_type, formula_key, sort_order, is_active
+    SELECT id, code, parent_code, line_type, formula_key, sort_order
     FROM finanzas.pnl_lines_versioned
     WHERE structure_version_id = ${versionId}::uuid
       AND is_active = true
   `;
+
+  // Empty structure
+  if (lines.length === 0) {
+    errors.push({ code: "EMPTY_STRUCTURE", message: "La versión no tiene líneas activas" });
+    return { valid: false, errors, warnings };
+  }
 
   const codeSet = new Set(lines.map((l) => l.code as string));
   const sortOrders = lines.map((l) => l.sort_order as number);
@@ -34,9 +42,9 @@ export async function validatePnlStructure(versionId: string): Promise<Validatio
   }
 
   for (const line of lines) {
-    const code = line.code as string;
+    const code       = line.code       as string;
     const parentCode = line.parent_code as string | null;
-    const lineType = line.line_type as string;
+    const lineType   = line.line_type  as string;
     const formulaKey = line.formula_key as string | null;
 
     // parent_code must exist in same version
@@ -56,22 +64,35 @@ export async function validatePnlStructure(versionId: string): Promise<Validatio
         context: { code },
       });
     }
+
+    // non-calculated lines should not have formula_key
+    if (lineType !== "calculated" && formulaKey) {
+      warnings.push({
+        code: "FORMULA_KEY_ON_NON_CALCULATED",
+        message: `Línea "${code}" tiene formula_key "${formulaKey}" pero su tipo es "${lineType}"`,
+        context: { code, lineType, formulaKey },
+      });
+    }
   }
 
   // Detect hierarchy cycles (DFS)
   const parentMap = new Map<string, string | null>();
   for (const l of lines) parentMap.set(l.code as string, (l.parent_code as string | null) ?? null);
 
+  const cyclesReported = new Set<string>();
   for (const startCode of codeSet) {
     const visited = new Set<string>();
     let current: string | null = startCode;
     while (current) {
       if (visited.has(current)) {
-        errors.push({
-          code: "HIERARCHY_CYCLE",
-          message: `Ciclo detectado en jerarquía comenzando en "${startCode}"`,
-          context: { startCode },
-        });
+        if (!cyclesReported.has(current)) {
+          cyclesReported.add(current);
+          errors.push({
+            code: "HIERARCHY_CYCLE",
+            message: `Ciclo detectado en jerarquía en "${current}"`,
+            context: { startCode, cycleAt: current },
+          });
+        }
         break;
       }
       visited.add(current);
@@ -80,40 +101,51 @@ export async function validatePnlStructure(versionId: string): Promise<Validatio
   }
 
   // formula_key components must reference existing active lines
+  // Note: pnl_formula_components_versioned has no is_active column
   const formulaKeys = [...new Set(lines.filter((l) => l.formula_key).map((l) => l.formula_key as string))];
-  if (formulaKeys.length) {
-    const components = await sql`
-      SELECT formula_key, component_line_code
-      FROM finanzas.pnl_formula_components_versioned
-      WHERE structure_version_id = ${versionId}::uuid
-        AND is_active = true
-    `;
 
-    const componentsByKey = new Map<string, string[]>();
-    for (const c of components) {
-      const key = c.formula_key as string;
-      if (!componentsByKey.has(key)) componentsByKey.set(key, []);
-      componentsByKey.get(key)!.push(c.component_line_code as string);
+  const components = await sql`
+    SELECT formula_key, component_line_code
+    FROM finanzas.pnl_formula_components_versioned
+    WHERE structure_version_id = ${versionId}::uuid
+  `;
+
+  const componentsByKey = new Map<string, string[]>();
+  for (const c of components) {
+    const key = c.formula_key as string;
+    if (!componentsByKey.has(key)) componentsByKey.set(key, []);
+    componentsByKey.get(key)!.push(c.component_line_code as string);
+  }
+
+  for (const key of formulaKeys) {
+    const comps = componentsByKey.get(key) ?? [];
+    if (!comps.length) {
+      errors.push({
+        code: "FORMULA_WITHOUT_COMPONENTS",
+        message: `Fórmula "${key}" no tiene componentes`,
+        context: { formulaKey: key },
+      });
     }
-
-    for (const key of formulaKeys) {
-      const comps = componentsByKey.get(key) ?? [];
-      if (!comps.length) {
+    for (const compCode of comps) {
+      if (!codeSet.has(compCode)) {
         errors.push({
-          code: "FORMULA_WITHOUT_COMPONENTS",
-          message: `Formula "${key}" no tiene componentes`,
-          context: { formulaKey: key },
+          code: "FORMULA_COMPONENT_NOT_FOUND",
+          message: `Componente "${compCode}" de fórmula "${key}" no existe como línea activa`,
+          context: { formulaKey: key, componentCode: compCode },
         });
       }
-      for (const compCode of comps) {
-        if (!codeSet.has(compCode)) {
-          errors.push({
-            code: "FORMULA_COMPONENT_NOT_FOUND",
-            message: `Componente "${compCode}" de fórmula "${key}" no existe en esta versión`,
-            context: { formulaKey: key, componentCode: compCode },
-          });
-        }
-      }
+    }
+  }
+
+  // Warn about formula_keys in formula table that no calculated line references
+  const referencedKeys = new Set(formulaKeys);
+  for (const key of componentsByKey.keys()) {
+    if (!referencedKeys.has(key)) {
+      warnings.push({
+        code: "ORPHAN_FORMULA",
+        message: `Fórmula "${key}" existe en la tabla pero ninguna línea la referencia`,
+        context: { formulaKey: key },
+      });
     }
   }
 
@@ -138,5 +170,18 @@ export async function validatePnlStructure(versionId: string): Promise<Validatio
     });
   }
 
-  return { valid: errors.length === 0, errors };
+  // Warn if no mappings at all
+  const [mappingCount] = await sql`
+    SELECT COUNT(*)::int AS cnt
+    FROM finanzas.account_pnl_mappings_versioned
+    WHERE structure_version_id = ${versionId}::uuid AND is_active = true
+  `;
+  if (Number(mappingCount.cnt) === 0) {
+    warnings.push({
+      code: "NO_MAPPINGS",
+      message: "La versión no tiene mappings de cuentas — los reportes quedarán vacíos",
+    });
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
 }

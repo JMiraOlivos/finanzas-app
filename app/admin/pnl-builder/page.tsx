@@ -5,8 +5,9 @@ import { PnlVersionList } from "@/components/admin/pnl/PnlVersionList";
 import { PnlStructureEditor } from "@/components/admin/pnl/PnlStructureEditor";
 import { PnlMappingsEditor } from "@/components/admin/pnl/PnlMappingsEditor";
 import { PnlFormulaEditor } from "@/components/admin/pnl/PnlFormulaEditor";
+import { PnlValidatePanel } from "@/components/admin/pnl/PnlValidatePanel";
 
-type Tab = "versions" | "structure" | "mappings" | "formulas";
+type Tab = "versions" | "structure" | "mappings" | "formulas" | "validate";
 
 type SelectedVersion = {
   id: string;
@@ -71,12 +72,13 @@ export default function PnlBuilderPage() {
 
       {/* Tabs */}
       <div className="flex items-center gap-0 border-b border-ev-gray7">
-        {(["versions", "structure", "mappings", "formulas"] as Tab[]).map((t) => {
+        {(["versions", "structure", "mappings", "formulas", "validate"] as Tab[]).map((t) => {
           const labels: Record<Tab, string> = {
             versions:  "Versiones",
             structure: "Estructura",
             mappings:  "Mappings",
             formulas:  "Fórmulas",
+            validate:  "Validar",
           };
           return (
             <button
@@ -131,6 +133,16 @@ export default function PnlBuilderPage() {
           <div className="space-y-3">
             <VersionBadge />
             <PnlFormulaEditor version={selectedVersion} />
+          </div>
+        ) : <NoVersionSelected />
+      )}
+
+      {/* Tab: Validar */}
+      {tab === "validate" && (
+        selectedVersion ? (
+          <div className="space-y-3">
+            <VersionBadge />
+            <PnlValidatePanel versionId={selectedVersion.id} versionName={selectedVersion.name} />
           </div>
         ) : <NoVersionSelected />
       )}
