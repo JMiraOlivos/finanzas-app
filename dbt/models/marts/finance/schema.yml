@@ -79,6 +79,34 @@ models:
       - name: period_month
         tests: [not_null]
 
+  - name: fct_company_bullet_kpis
+    description: >
+      KPIs de cumplimiento por empresa para bullet charts: real YTD vs presupuesto y año anterior.
+      Dos filas por (company, period): REVENUE_YTD y EBITDA_YTD.
+      El status de EBITDA maneja targets negativos correctamente.
+    columns:
+      - name: company_id
+        tests: [not_null]
+      - name: period_month
+        tests: [not_null]
+      - name: metric_code
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['REVENUE_YTD', 'EBITDA_YTD']
+      - name: actual_ytd
+        description: "Monto real YTD para la métrica."
+      - name: target_ytd
+        description: "Presupuesto YTD activo. Null si no hay presupuesto cargado."
+      - name: attainment_pct
+        description: "actual_ytd / target_ytd. Null si target es null o 0."
+      - name: status
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['red', 'yellow', 'green', 'blue', 'gray']
+
   - name: dq_financial_control
     description: >
       Control de calidad por carga procesada: semáforo green/yellow/red,

@@ -1,8 +1,8 @@
 -- Migration 014: fn_pnl_ytd_comparison
 -- Returns the full P&L hierarchy (detail → subtotals → calculated) with three
 -- simultaneous YTD amounts: actual, prior-year, and active budget.
--- Self-contained: reads from fct_pnl_monthly + budget_monthly directly (no dbt mart required).
--- Mirrors fn_pnl_ytd structure from 012_pnl_functions_v2.sql.
+-- Self-contained: reads from fct_pnl_monthly + budget_monthly directly.
+-- budget_all covers both detail-level and subtotal-level budget entry styles.
 SET search_path TO finanzas;
 
 CREATE OR REPLACE FUNCTION fn_pnl_ytd_comparison(
@@ -40,7 +40,7 @@ WITH
       AND (p_company_ids IS NULL OR id = ANY(p_company_ids))
   ),
 
-  -- ── Actual YTD: same pattern as fn_pnl_ytd ─────────────────────────────────
+  -- ── Actual YTD ──────────────────────────────────────────────────────────────
   actual_detail AS (
     SELECT a.id AS company_id, pl.code AS line_code,
            COALESCE(SUM(m.amount), 0) AS amount
@@ -70,8 +70,10 @@ WITH
     GROUP BY a.id, pl.code
   ),
 
-  -- ── Budget YTD: active version, same date range as actual ────────────────────
-  budget_detail AS (
+  -- ── Budget YTD: active versions, ALL line types ──────────────────────────────
+  -- Handles both detail-level budget (mapped to individual accounts) and
+  -- subtotal-level budget (mapped directly to RRHH, MARKETING, etc.)
+  budget_all AS (
     SELECT a.id AS company_id, pl.code AS line_code,
            COALESCE(SUM(bm.amount), 0) AS amount
     FROM allowed a
@@ -84,11 +86,11 @@ WITH
          AND bm.pnl_line_id  = pl.id
          AND bm.period_month >= (SELECT v FROM ytd_start)
          AND bm.period_month <= p_period_month
-    WHERE pl.show_in_report = TRUE AND pl.line_type = 'detail'
+    WHERE pl.show_in_report = TRUE
     GROUP BY a.id, pl.code
   ),
 
-  -- ── Combine three amounts into one detail row per (company, line) ────────────
+  -- ── Combine three amounts per (company, detail_line) ────────────────────────
   detail AS (
     SELECT
       a.id              AS company_id,
@@ -103,16 +105,17 @@ WITH
       pl.is_highlighted,
       COALESCE(ac.amount, 0) AS actual_ytd,
       COALESCE(ly.amount, 0) AS ly_ytd,
-      COALESCE(bd.amount, 0) AS budget_ytd
+      COALESCE(ba.amount, 0) AS budget_ytd
     FROM allowed a
     CROSS JOIN pnl_lines pl
     LEFT JOIN actual_detail ac ON ac.company_id = a.id AND ac.line_code = pl.code
     LEFT JOIN ly_detail     ly ON ly.company_id = a.id AND ly.line_code = pl.code
-    LEFT JOIN budget_detail bd ON bd.company_id = a.id AND bd.line_code = pl.code
+    LEFT JOIN budget_all    ba ON ba.company_id = a.id AND ba.line_code = pl.code
     WHERE pl.show_in_report = TRUE AND pl.line_type = 'detail'
   ),
 
-  -- ── Subtotal lines: sum direct detail children ───────────────────────────────
+  -- ── Subtotals: sum detail children ──────────────────────────────────────────
+  -- budget_ytd = children sum (detail-level budget) + direct entry (subtotal-level budget)
   subtotals AS (
     SELECT
       a.id              AS company_id,
@@ -125,14 +128,17 @@ WITH
       pl.line_type,
       pl.is_bold,
       pl.is_highlighted,
-      COALESCE(SUM(d.actual_ytd), 0) AS actual_ytd,
-      COALESCE(SUM(d.ly_ytd),     0) AS ly_ytd,
-      COALESCE(SUM(d.budget_ytd), 0) AS budget_ytd
+      COALESCE(SUM(d.actual_ytd), 0)                              AS actual_ytd,
+      COALESCE(SUM(d.ly_ytd),     0)                              AS ly_ytd,
+      COALESCE(SUM(d.budget_ytd), 0) + COALESCE(MAX(ba.amount), 0) AS budget_ytd
     FROM allowed a
     JOIN pnl_lines pl ON pl.line_type = 'subtotal' AND pl.show_in_report = TRUE
     LEFT JOIN detail d
       ON  d.company_id  = a.id
       AND d.parent_code = pl.code
+    LEFT JOIN budget_all ba
+      ON  ba.company_id = a.id
+      AND ba.line_code  = pl.code
     GROUP BY a.id, a.name, pl.code, pl.label, pl.parent_code, pl.level,
              pl.sort_order, pl.line_type, pl.is_bold, pl.is_highlighted
   ),
@@ -144,7 +150,6 @@ WITH
   ),
 
   -- ── Calculated lines: EBITDA, RESULTADO_ANTES_IMP, RESULTADO_FINAL ───────────
-  -- Mirrors hardcoded lists from fn_pnl_ytd (same convention as 012_pnl_functions_v2)
   calculated AS (
     SELECT
       a.id              AS company_id,

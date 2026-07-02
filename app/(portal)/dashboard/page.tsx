@@ -9,6 +9,7 @@ import { ClosureStatusPanel, type ControlRow } from "@/components/dashboard/Clos
 import { CompanyRanking, type CompanyRankingRow } from "@/components/dashboard/CompanyRanking";
 import { ActiveFiltersBar } from "@/components/dashboard/ActiveFiltersBar";
 import { VarianceDriversPanel } from "@/components/dashboard/VarianceDriversPanel";
+import { CompanyBulletGrid } from "@/components/dashboard/CompanyBulletGrid";
 import type { ChartsData } from "@/components/dashboard/DashboardCharts";
 
 const DashboardCharts = dynamic(
@@ -235,6 +236,14 @@ function DashboardContent() {
           ))}
         </div>
       )}
+
+      {/* ── Bullet Charts: cumplimiento por empresa ── */}
+      <CompanyBulletGrid
+        period={period}
+        companyIds={companyIdParam}
+        onCompanyClick={(id) => setFilter("companyId", companyIdParam === id ? null : id)}
+        activeCompanyId={companyIdParam}
+      />
 
       {/* ── Bloque 2: Alertas + Calidad de datos ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
