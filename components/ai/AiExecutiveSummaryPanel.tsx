@@ -47,6 +47,7 @@ export function AiExecutiveSummaryPanel({ period, companyIds }: Props) {
     fetch(`/api/ai/period-summary?${qs}`)
       .then((r) => r.json() as Promise<PeriodSummaryResponse | null>)
       .then((data) => {
+        console.log("[AiPanel] cache data:", JSON.stringify({ headline: (data as Record<string,unknown>)?.headline, findingsLen: (data as Record<string,unknown>)?.findings?.length ?? "undefined" }));
         if (data) { setResult(data); setState("success"); setExpanded(true); }
         else       { setState("idle"); }
       })
