@@ -15,9 +15,9 @@ with detail_with_parent as (
         sum(c.ly_ytd)      as ly_ytd,
         sum(c.budget_ytd)  as budget_ytd
     from {{ ref('fct_pnl_ytd_comparison') }} c
-    join {{ ref('stg_pnl_lines') }} pl_detail
+    join {{ ref('stg_active_pnl_lines') }} pl_detail
         on pl_detail.code = c.pnl_line_code
-    join {{ ref('stg_pnl_lines') }} pl_parent
+    join {{ ref('stg_active_pnl_lines') }} pl_parent
         on pl_parent.code = pl_detail.parent_code
     where c.show_in_report = true
     group by

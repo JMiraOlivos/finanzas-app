@@ -25,7 +25,7 @@ unmapped as (
         on  m.company_id   = je.company_id
         and m.account_code = je.account_code
     where je.is_pnl = true
-      and m.pnl_line_id is null
+      and m.pnl_line_code is null
     group by je.company_id, je.period_month
 ),
 stuck as (

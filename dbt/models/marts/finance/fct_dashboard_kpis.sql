@@ -4,13 +4,13 @@
 -- add formulas here; update the table instead.
 with ebitda_components as (
     select component_line_code
-    from {{ ref('stg_pnl_formula_components') }}
+    from {{ ref('stg_active_pnl_formula_components') }}
     where formula_key = 'EBITDA'
 ),
 
 resultado_components as (
     select component_line_code
-    from {{ ref('stg_pnl_formula_components') }}
+    from {{ ref('stg_active_pnl_formula_components') }}
     where formula_key = 'RESULTADO_FINAL'
 ),
 

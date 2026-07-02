@@ -22,33 +22,33 @@ models:
         tests: [not_null]
 
   - name: int_account_mapping_resolved
-    description: "Mapping resuelto por (company, account_code). Empresa-específico gana sobre global."
+    description: "Mapping resuelto por (company, account_code). Empresa-específico gana sobre global. PR 3: produce pnl_line_code TEXT (antes pnl_line_id UUID)."
     columns:
       - name: company_id
         tests: [not_null]
       - name: account_code
         tests: [not_null]
-      - name: pnl_line_id
+      - name: pnl_line_code
         tests: [not_null]
 
   - name: int_pnl_movements_mapped
-    description: "Movimientos P&L activos cruzados con su línea PnL resuelta. Excluye no-mapeados."
+    description: "Movimientos P&L activos cruzados con su línea PnL resuelta. Excluye no-mapeados. PR 3: lleva pnl_line_code TEXT."
     columns:
       - name: journal_entry_id
         tests: [unique, not_null]
       - name: company_id
         tests: [not_null]
-      - name: pnl_line_id
+      - name: pnl_line_code
         tests: [not_null]
 
   - name: int_scenario_monthly
-    description: "Real + presupuesto + forecast unificados por (empresa, período, línea PnL)."
+    description: "Real + presupuesto + forecast unificados por (empresa, período, pnl_line_code). PR 3: migrado de pnl_line_id a pnl_line_code."
     columns:
       - name: company_id
         tests: [not_null]
       - name: period_month
         tests: [not_null]
-      - name: pnl_line_id
+      - name: pnl_line_code
         tests: [not_null]
       - name: scenario
         tests:

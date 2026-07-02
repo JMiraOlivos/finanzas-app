@@ -1,5 +1,6 @@
 -- P&L journal entries joined to their resolved pnl_line mapping.
 -- Excludes unmapped accounts (those appear in dq_financial_control).
+-- PR 3: lleva pnl_line_code TEXT (antes pnl_line_id UUID) desde int_account_mapping_resolved.
 select
     je.id                                       as journal_entry_id,
     je.company_id,
@@ -12,7 +13,7 @@ select
     je.credit,
     je.amount,
     je.currency,
-    m.pnl_line_id,
+    m.pnl_line_code,
     m.sign_multiplier,
     je.amount * m.sign_multiplier               as mapped_amount
 from {{ ref('int_active_journal_entries') }} je
