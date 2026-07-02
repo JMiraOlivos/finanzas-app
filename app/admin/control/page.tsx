@@ -84,7 +84,7 @@ export default async function ControlPage() {
     ORDER BY c.name, uf.period_month DESC NULLS LAST
   `,
     sql`
-      SELECT triggered_at, status
+      SELECT triggered_at, completed_at, status
       FROM finanzas.dbt_run_history
       ORDER BY triggered_at DESC
       LIMIT 1
@@ -98,13 +98,28 @@ export default async function ControlPage() {
         <p className="text-sm text-neutral-500 mt-1">
           Estado de cargas por empresa y período. Revisar antes de publicar información a directorio.
         </p>
-        {dbtStatus[0] && (
-          <p className="text-xs text-neutral-400 mt-1">
-            Marts actualizados: hace {formatRelativeTime(dbtStatus[0].triggered_at as Date)}
-            {" "}·{" "}
-            {(dbtStatus[0].status as string) === "triggered" ? "en progreso" : dbtStatus[0].status as string}
-          </p>
-        )}
+        {dbtStatus[0] && (() => {
+          const status = dbtStatus[0].status as string;
+          const triggeredAt = dbtStatus[0].triggered_at as Date;
+          const completedAt = dbtStatus[0].completed_at as Date | null;
+          const refDate = completedAt ?? triggeredAt;
+          const minutesSinceTriggered = Math.floor((Date.now() - new Date(triggeredAt).getTime()) / 60000);
+          const isStuck = status === "triggered" && minutesSinceTriggered > 20;
+          const statusLabel =
+            status === "completed" ? "completado" :
+            status === "failed"    ? "fallido" :
+            isStuck                ? "sin respuesta" :
+                                     "en progreso";
+          return (
+            <p className="text-xs text-neutral-400 mt-1">
+              Marts actualizados: hace {formatRelativeTime(refDate)}
+              {" "}·{" "}
+              <span className={isStuck || status === "failed" ? "text-amber-500" : undefined}>
+                {statusLabel}
+              </span>
+            </p>
+          );
+        })()}
       </div>
 
       <div className="rounded-xl border bg-white shadow-sm overflow-hidden">

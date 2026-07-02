@@ -59,6 +59,9 @@ const MIGRATION_FILES = [
   "030_fn_pnl_ytd_for_structure_version_v2.sql",
   // Fix: unique indexes must scope to is_active=true to allow deactivate+insert upsert pattern
   "031_fix_apmv_unique_indexes.sql",
+  // Fix: fn_pnl_ytd / fn_pnl_lmonth_ytd / fn_pnl_monthly now read from pnl_lines_versioned
+  // so new lines added to a published structure version appear in EERR immediately after dbt run
+  "032_fn_pnl_ytd_use_versioned_lines.sql",
 ];
 
 async function run() {
