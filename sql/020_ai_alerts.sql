@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS finanzas.ai_alerts (
   severity        TEXT NOT NULL CHECK (severity IN ('high', 'medium', 'low')),
   title           TEXT NOT NULL,
   detail          TEXT,
-  source_run_id   UUID REFERENCES finanzas.ai_analysis_runs(id) ON DELETE SET NULL,
+  source_run_id   UUID,
   status          TEXT NOT NULL DEFAULT 'open'
                     CHECK (status IN ('open', 'acknowledged', 'resolved')),
   acknowledged_by UUID REFERENCES finanzas.app_users(id),
