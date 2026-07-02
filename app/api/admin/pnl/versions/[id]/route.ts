@@ -3,21 +3,15 @@ import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 
-function authGuard(session: Awaited<ReturnType<typeof auth>>) {
+type Params = { params: Promise<{ id: string }> };
+
+export async function GET(_req: NextRequest, { params }: Params) {
+  const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const user = session.user as { id: string; role: string };
   if (user.role !== "admin" && user.role !== "finance") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  return user;
-}
-
-type Params = { params: Promise<{ id: string }> };
-
-export async function GET(_req: NextRequest, { params }: Params) {
-  const session = await auth();
-  const result = authGuard(session);
-  if (result instanceof NextResponse) return result;
 
   const { id } = await params;
 
@@ -60,9 +54,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   const session = await auth();
-  const result = authGuard(session);
-  if (result instanceof NextResponse) return result;
-  const user = result;
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = session.user as { id: string; role: string };
+  if (user.role !== "admin" && user.role !== "finance") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const { id } = await params;
 
@@ -88,13 +84,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   await sql`
     UPDATE finanzas.pnl_structure_versions
     SET
-      name          = COALESCE(${body.name?.trim() ?? null}, name),
-      description   = COALESCE(${body.description ?? null}, description),
-      notes         = COALESCE(${body.notes ?? null}, notes),
+      name           = COALESCE(${body.name?.trim() ?? null}, name),
+      description    = COALESCE(${body.description ?? null}, description),
+      notes          = COALESCE(${body.notes ?? null}, notes),
       effective_from = CASE WHEN ${body.effectiveFrom !== undefined} THEN ${body.effectiveFrom ?? null} ELSE effective_from END,
       effective_to   = CASE WHEN ${body.effectiveTo !== undefined} THEN ${body.effectiveTo ?? null} ELSE effective_to END,
-      updated_by    = ${user.id}::uuid,
-      updated_at    = now()
+      updated_by     = ${user.id}::uuid,
+      updated_at     = now()
     WHERE id = ${id}::uuid
   `;
 

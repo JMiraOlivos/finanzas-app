@@ -3,19 +3,13 @@ import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 
-function authGuard(session: Awaited<ReturnType<typeof auth>>) {
+export async function GET() {
+  const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const user = session.user as { id: string; role: string };
   if (user.role !== "admin" && user.role !== "finance") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  return user;
-}
-
-export async function GET() {
-  const session = await auth();
-  const result = authGuard(session);
-  if (result instanceof NextResponse) return result;
 
   const rows = await sql`
     SELECT
@@ -34,29 +28,31 @@ export async function GET() {
   `;
 
   return NextResponse.json(rows.map((r) => ({
-    id:             r.id,
-    name:           r.name,
-    description:    r.description ?? null,
-    status:         r.status,
-    isActive:       r.is_active,
-    effectiveFrom:  r.effective_from ?? null,
-    effectiveTo:    r.effective_to ?? null,
-    createdAt:      r.created_at,
-    updatedAt:      r.updated_at,
-    publishedAt:    r.published_at ?? null,
-    archivedAt:     r.archived_at ?? null,
-    notes:          r.notes ?? null,
-    createdByEmail: r.created_by_email ?? null,
+    id:               r.id,
+    name:             r.name,
+    description:      r.description ?? null,
+    status:           r.status,
+    isActive:         r.is_active,
+    effectiveFrom:    r.effective_from ?? null,
+    effectiveTo:      r.effective_to ?? null,
+    createdAt:        r.created_at,
+    updatedAt:        r.updated_at,
+    publishedAt:      r.published_at ?? null,
+    archivedAt:       r.archived_at ?? null,
+    notes:            r.notes ?? null,
+    createdByEmail:   r.created_by_email ?? null,
     publishedByEmail: r.published_by_email ?? null,
-    lineCount:      Number(r.line_count),
+    lineCount:        Number(r.line_count),
   })));
 }
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  const result = authGuard(session);
-  if (result instanceof NextResponse) return result;
-  const user = result;
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = session.user as { id: string; role: string };
+  if (user.role !== "admin" && user.role !== "finance") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const body = await request.json() as {
     name: string;
