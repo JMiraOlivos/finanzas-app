@@ -71,24 +71,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
-  // Persist run (fire-and-forget to not delay response)
+  // Persist run — awaited so errors surface in Vercel logs
   const periodMonth = period.slice(0, 7) + "-01";
-  sql`
+  const scopeJson   = JSON.stringify(contextPack.scope ?? {});
+  const analystJson = JSON.stringify({ findings: result.findings, risks: result.risks, recommendedActions: result.recommendedActions });
+  const finalJson   = JSON.stringify(result);
+  const createdBy   = user.id ?? null;
+
+  await sql`
     INSERT INTO finanzas.ai_analysis_runs
       (period_month, scope, analysis_type, prompt_version, model_name,
        analyst_output, cfo_output, final_output, created_by)
     VALUES (
       ${periodMonth}::date,
-      ${JSON.stringify(contextPack.scope)}::jsonb,
+      ${scopeJson}::jsonb,
       'period_summary',
       ${result.promptVersion},
       ${result.modelName},
-      ${JSON.stringify({ findings: result.findings, risks: result.risks, recommendedActions: result.recommendedActions })}::jsonb,
+      ${analystJson}::jsonb,
       ${result.executiveSummary},
-      ${JSON.stringify(result)}::jsonb,
-      ${user.id}::uuid
+      ${finalJson}::jsonb,
+      ${createdBy}
     )
-  `.catch(() => {});
+  `.catch((err) => { console.error("[ai/period-summary] INSERT failed:", err); });
 
   // Audit log
   void logAudit({
