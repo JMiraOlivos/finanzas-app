@@ -56,12 +56,15 @@ WITH
   ),
 
   -- ── LY YTD: same window shifted 1 year back ─────────────────────────────────
+  -- Reads from v_pnl_base_monthly (live view on journal_entries) so LY data
+  -- appears immediately after upload without waiting for a dbt refresh.
+  -- NULL (not 0) when a company has no LY entries → renders as "—" in the table.
   ly_detail AS (
     SELECT a.id AS company_id, pl.code AS line_code,
-           COALESCE(SUM(m.amount), 0) AS amount
+           SUM(m.amount) AS amount
     FROM allowed a
     CROSS JOIN pnl_lines pl
-    LEFT JOIN fct_pnl_monthly m
+    LEFT JOIN v_pnl_base_monthly m
       ON  m.company_id    = a.id
       AND m.pnl_line_code = pl.code
       AND m.period_month >= (SELECT v FROM ly_start)
@@ -105,7 +108,7 @@ WITH
       pl.is_bold,
       pl.is_highlighted,
       COALESCE(ac.amount, 0) AS actual_ytd,
-      COALESCE(ly.amount, 0) AS ly_ytd,
+      ly.amount              AS ly_ytd,
       ba.amount              AS budget_ytd
     FROM allowed a
     CROSS JOIN pnl_lines pl
@@ -130,7 +133,7 @@ WITH
       pl.is_bold,
       pl.is_highlighted,
       COALESCE(SUM(d.actual_ytd), 0)                              AS actual_ytd,
-      COALESCE(SUM(d.ly_ytd),     0)                              AS ly_ytd,
+      SUM(d.ly_ytd)                                               AS ly_ytd,
       CASE
         WHEN SUM(d.budget_ytd) IS NULL AND MAX(ba.amount) IS NULL THEN NULL
         ELSE COALESCE(SUM(d.budget_ytd), 0) + COALESCE(MAX(ba.amount), 0)
@@ -185,20 +188,26 @@ WITH
       END AS actual_ytd,
       CASE
         WHEN pl.formula_key = 'EBITDA' THEN (
-          SELECT COALESCE(SUM(b.ly_ytd), 0) FROM base b WHERE b.company_id = a.id
+          SELECT CASE WHEN BOOL_OR(b.ly_ytd IS NOT NULL)
+                      THEN COALESCE(SUM(b.ly_ytd), 0) ELSE NULL END
+          FROM base b WHERE b.company_id = a.id
             AND b.line_code IN ('INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
               'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA','NO_OPERACIONALES'))
         WHEN pl.formula_key = 'RESULTADO_ANTES_IMP' THEN (
-          SELECT COALESCE(SUM(b.ly_ytd), 0) FROM base b WHERE b.company_id = a.id
+          SELECT CASE WHEN BOOL_OR(b.ly_ytd IS NOT NULL)
+                      THEN COALESCE(SUM(b.ly_ytd), 0) ELSE NULL END
+          FROM base b WHERE b.company_id = a.id
             AND b.line_code IN ('INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
               'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA',
               'NO_OPERACIONALES','INTERESES_DEPR'))
         WHEN pl.formula_key = 'RESULTADO_FINAL' THEN (
-          SELECT COALESCE(SUM(b.ly_ytd), 0) FROM base b WHERE b.company_id = a.id
+          SELECT CASE WHEN BOOL_OR(b.ly_ytd IS NOT NULL)
+                      THEN COALESCE(SUM(b.ly_ytd), 0) ELSE NULL END
+          FROM base b WHERE b.company_id = a.id
             AND b.line_code IN ('INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
               'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA',
               'NO_OPERACIONALES','INTERESES_DEPR','IMPUESTO'))
-        ELSE 0
+        ELSE NULL
       END AS ly_ytd,
       CASE
         WHEN pl.formula_key = 'EBITDA' THEN (
