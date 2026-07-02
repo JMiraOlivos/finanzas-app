@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const rows = await sql`
-      SELECT final_output, created_at
+      SELECT final_output::text AS json_text, created_at
       FROM finanzas.ai_analysis_runs
       WHERE period_month = ${periodMonth}::date
         AND analysis_type = 'period_summary'
@@ -27,11 +27,12 @@ export async function GET(request: NextRequest) {
 
     if (!rows.length) return NextResponse.json(null);
 
-    const output = {
-      ...(rows[0].final_output as Record<string, unknown>),
-      generatedAt: (rows[0].created_at as Date).toISOString(),
-    };
-    return NextResponse.json(output);
+    const parsed = JSON.parse(rows[0].json_text as string) as Record<string, unknown>;
+    const createdAt = rows[0].created_at instanceof Date
+      ? rows[0].created_at.toISOString()
+      : String(rows[0].created_at);
+
+    return NextResponse.json({ ...parsed, generatedAt: createdAt });
   } catch (err) {
     console.error("[ai/period-summary GET] error:", err);
     return NextResponse.json(null);
