@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { formatCurrency, formatPercentage } from "@/lib/formatters";
+import { formatCurrencyUnit, formatPercentage, type CurrencyUnit } from "@/lib/formatters";
 import type { DriverRow, DriversPayload } from "@/app/api/dashboard/drivers/route";
 
 type Comparison = "ly" | "budget";
@@ -9,9 +9,10 @@ type Comparison = "ly" | "budget";
 type Props = {
   period: string;
   companyIds?: string | null;
+  unit?: CurrencyUnit;
 };
 
-export function VarianceDriversPanel({ period, companyIds }: Props) {
+export function VarianceDriversPanel({ period, companyIds, unit = "millions" }: Props) {
   const [comparison, setComparison] = useState<Comparison>("budget");
   const [data,       setData]       = useState<DriversPayload | null>(null);
   const [loading,    setLoading]    = useState(true);
@@ -74,7 +75,7 @@ export function VarianceDriversPanel({ period, companyIds }: Props) {
             )}
             <div className="space-y-2">
               {data.positive.map((d) => (
-                <DriverItem key={d.pnlLineCode} row={d} positive />
+                <DriverItem key={d.pnlLineCode} row={d} positive unit={unit} />
               ))}
             </div>
           </div>
@@ -89,7 +90,7 @@ export function VarianceDriversPanel({ period, companyIds }: Props) {
             )}
             <div className="space-y-2">
               {data.negative.map((d) => (
-                <DriverItem key={d.pnlLineCode} row={d} positive={false} />
+                <DriverItem key={d.pnlLineCode} row={d} positive={false} unit={unit} />
               ))}
             </div>
           </div>
@@ -105,7 +106,7 @@ export function VarianceDriversPanel({ period, companyIds }: Props) {
   );
 }
 
-function DriverItem({ row, positive }: { row: DriverRow; positive: boolean }) {
+function DriverItem({ row, positive, unit = "millions" }: { row: DriverRow; positive: boolean; unit?: CurrencyUnit }) {
   const color  = positive ? "text-green-600 bg-green-50" : "text-ev-red bg-red-50";
   const arrow  = positive ? "▲" : "▼";
 
@@ -113,7 +114,7 @@ function DriverItem({ row, positive }: { row: DriverRow; positive: boolean }) {
     <div className="flex items-center justify-between gap-3 text-sm">
       <span className="font-body text-ev-black truncate">{row.pnlLineLabel}</span>
       <span className={["tabular-nums text-xs font-body px-2 py-0.5 rounded font-medium whitespace-nowrap", color].join(" ")}>
-        {arrow} {formatCurrency(Math.abs(row.varianceAmount))}
+        {arrow} {formatCurrencyUnit(Math.abs(row.varianceAmount), unit)}
         {row.variancePct !== null && (
           <span className="ml-1 opacity-70">
             ({formatPercentage(Math.abs(row.variancePct))})

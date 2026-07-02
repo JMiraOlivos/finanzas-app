@@ -1,9 +1,10 @@
-import { formatCurrency, formatPercentage } from "@/lib/formatters";
+import { formatCurrencyUnit, formatPercentage, type CurrencyUnit } from "@/lib/formatters";
 
 type Props = {
   label: string;
   value: number | null;
   format: "currency" | "percentage" | "number";
+  unit?: CurrencyUnit;
   vsPriorPct?: number | null;
   vsBudgetPct?: number | null;
   onClick?: () => void;
@@ -22,10 +23,10 @@ function DeltaBadge({ value, label }: { value: number | null | undefined; label:
   );
 }
 
-export function ScenarioKpiCard({ label, value, format, vsPriorPct, vsBudgetPct, onClick, isActive }: Props) {
+export function ScenarioKpiCard({ label, value, format, unit = "millions", vsPriorPct, vsBudgetPct, onClick, isActive }: Props) {
   const formatted =
     value === null ? "—"
-    : format === "currency"   ? formatCurrency(value)
+    : format === "currency"   ? formatCurrencyUnit(value, unit)
     : format === "percentage" ? formatPercentage(value)
     : String(value);
 

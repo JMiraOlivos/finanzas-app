@@ -8,11 +8,42 @@ const pctFormatter = new Intl.NumberFormat("es-CL", {
   maximumFractionDigits: 1,
 });
 
+const mmFormatter = new Intl.NumberFormat("es-CL", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const mFormatter = new Intl.NumberFormat("es-CL", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
+export type CurrencyUnit = "full" | "thousands" | "millions";
+
 export function formatCurrency(value: number | null | undefined): string {
   if (value === null || value === undefined) return "";
   const abs = Math.abs(value);
   const formatted = clpFormatter.format(abs);
   return value < 0 ? `(${formatted})` : formatted;
+}
+
+export function formatCurrencyUnit(
+  value: number | null | undefined,
+  unit: CurrencyUnit,
+): string {
+  if (value === null || value === undefined) return "";
+  if (unit === "full") return formatCurrency(value);
+  if (unit === "millions") {
+    const scaled = value / 1_000_000;
+    const abs = Math.abs(scaled);
+    const s = `${mmFormatter.format(abs)} MM`;
+    return scaled < 0 ? `(${s})` : s;
+  }
+  // thousands
+  const scaled = value / 1_000;
+  const abs = Math.abs(scaled);
+  const s = `${mFormatter.format(abs)} M`;
+  return scaled < 0 ? `(${s})` : s;
 }
 
 export function formatPercentage(value: number | null | undefined): string {

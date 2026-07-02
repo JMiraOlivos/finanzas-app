@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatCurrency, formatPercentage } from "@/lib/formatters";
+import { formatCurrencyUnit, formatPercentage, type CurrencyUnit } from "@/lib/formatters";
 
 export type CompanyRankingRow = {
   companyId: string;
@@ -19,6 +19,7 @@ type SortKey = "revenue" | "ebitda" | "ebitdaMargin" | "resultado";
 type Props = {
   rows: CompanyRankingRow[];
   loading?: boolean;
+  unit?: CurrencyUnit;
   activeCompanyId?: string | null;
   onCompanyClick?: (companyId: string, companyName: string) => void;
 };
@@ -49,7 +50,7 @@ const COLS: { key: SortKey; label: string }[] = [
   { key: "resultado",    label: "Resultado Final" },
 ];
 
-export function CompanyRanking({ rows, loading, activeCompanyId, onCompanyClick }: Props) {
+export function CompanyRanking({ rows, loading, unit = "millions", activeCompanyId, onCompanyClick }: Props) {
   const [sort, setSort]   = useState<SortKey>("revenue");
   const [asc,  setAsc]    = useState(false);
 
@@ -126,16 +127,16 @@ export function CompanyRanking({ rows, loading, activeCompanyId, onCompanyClick 
                     {row.companyName}
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-body text-ev-black">
-                    {row.revenue != null ? formatCurrency(row.revenue) : "—"}
+                    {row.revenue != null ? formatCurrencyUnit(row.revenue, unit) : "—"}
                   </td>
                   <td className={["px-4 py-2.5 text-right tabular-nums font-body", (row.ebitda ?? 0) < 0 ? "text-ev-red" : "text-ev-black"].join(" ")}>
-                    {row.ebitda != null ? formatCurrency(row.ebitda) : "—"}
+                    {row.ebitda != null ? formatCurrencyUnit(row.ebitda, unit) : "—"}
                   </td>
                   <td className={["px-4 py-2.5 text-right tabular-nums font-body", (row.ebitdaMargin ?? 0) < 0 ? "text-ev-red" : "text-ev-black"].join(" ")}>
                     {row.ebitdaMargin != null ? formatPercentage(row.ebitdaMargin) : "—"}
                   </td>
                   <td className={["px-4 py-2.5 text-right tabular-nums font-body", (row.resultado ?? 0) < 0 ? "text-ev-red" : "text-ev-black"].join(" ")}>
-                    {row.resultado != null ? formatCurrency(row.resultado) : "—"}
+                    {row.resultado != null ? formatCurrencyUnit(row.resultado, unit) : "—"}
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <DeltaBadge value={row.revenueVsPriorPct} />

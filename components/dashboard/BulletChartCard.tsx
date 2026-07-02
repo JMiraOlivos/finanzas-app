@@ -1,7 +1,7 @@
 "use client";
 
 import { BulletChart, type BulletZone } from "./BulletChart";
-import { formatCurrency, formatPercentage } from "@/lib/formatters";
+import { formatCurrencyUnit, formatPercentage, type CurrencyUnit } from "@/lib/formatters";
 import type { CompanyBulletKpi } from "@/app/api/dashboard/bullets/route";
 
 type Status = CompanyBulletKpi["status"];
@@ -51,7 +51,7 @@ type Props = Pick<
   | "varianceVsTarget"
   | "varianceVsTargetPct"
   | "status"
->;
+> & { unit?: CurrencyUnit };
 
 export function BulletChartCard({
   metricCode,
@@ -63,6 +63,7 @@ export function BulletChartCard({
   varianceVsTarget,
   varianceVsTargetPct,
   status,
+  unit = "millions",
 }: Props) {
   const varPositive = varianceVsTarget !== null && varianceVsTarget >= 0;
   const zones = computeZones(target, metricCode);
@@ -83,15 +84,15 @@ export function BulletChartCard({
       {/* Values: actual / target / LY */}
       <div className="grid grid-cols-3 gap-1 text-[10px] font-body tabular-nums">
         <div>
-          <div className="text-ev-black font-medium">{actual !== null ? formatCurrency(actual) : "—"}</div>
+          <div className="text-ev-black font-medium">{actual !== null ? formatCurrencyUnit(actual, unit) : "—"}</div>
           <div className="text-ev-gray4">Real</div>
         </div>
         <div>
-          <div className="text-ev-gray3 font-medium">{target !== null ? formatCurrency(target) : "—"}</div>
+          <div className="text-ev-gray3 font-medium">{target !== null ? formatCurrencyUnit(target, unit) : "—"}</div>
           <div className="text-ev-gray4">Ppto</div>
         </div>
         <div>
-          <div className="text-ev-gray5">{ly !== null ? formatCurrency(ly) : "—"}</div>
+          <div className="text-ev-gray5">{ly !== null ? formatCurrencyUnit(ly, unit) : "—"}</div>
           <div className="text-ev-gray4">LY</div>
         </div>
       </div>
@@ -100,7 +101,7 @@ export function BulletChartCard({
       {varianceVsTarget !== null && (
         <div className={["text-[10px] font-body tabular-nums", varPositive ? "text-ev-green" : "text-ev-red"].join(" ")}>
           {varPositive ? "▲" : "▼"}{" "}
-          {formatCurrency(Math.abs(varianceVsTarget))}
+          {formatCurrencyUnit(Math.abs(varianceVsTarget), unit)}
           {varianceVsTargetPct !== null && (
             <span className="ml-1 opacity-70">
               ({formatPercentage(Math.abs(varianceVsTargetPct))})

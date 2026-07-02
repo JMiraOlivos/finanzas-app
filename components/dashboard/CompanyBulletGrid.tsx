@@ -3,10 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { BulletChartCard } from "./BulletChartCard";
 import type { CompanyBulletKpi } from "@/app/api/dashboard/bullets/route";
+import type { CurrencyUnit } from "@/lib/formatters";
 
 type Props = {
   period: string;
   companyIds?: string | null;
+  unit?: CurrencyUnit;
   onCompanyClick: (companyId: string) => void;
   activeCompanyId?: string | null;
 };
@@ -28,7 +30,7 @@ function groupByCompany(rows: CompanyBulletKpi[]): CompanyGroup[] {
   return Array.from(map.values());
 }
 
-export function CompanyBulletGrid({ period, companyIds, onCompanyClick, activeCompanyId }: Props) {
+export function CompanyBulletGrid({ period, companyIds, unit = "millions", onCompanyClick, activeCompanyId }: Props) {
   const [data,    setData]    = useState<CompanyBulletKpi[]>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(false);
@@ -116,6 +118,7 @@ export function CompanyBulletGrid({ period, companyIds, onCompanyClick, activeCo
                       varianceVsTarget={m.varianceVsTarget}
                       varianceVsTargetPct={m.varianceVsTargetPct}
                       status={m.status}
+                      unit={unit}
                     />
                   ))}
                 </div>

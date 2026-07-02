@@ -11,7 +11,9 @@ import { ActiveFiltersBar } from "@/components/dashboard/ActiveFiltersBar";
 import { VarianceDriversPanel } from "@/components/dashboard/VarianceDriversPanel";
 import { CompanyBulletGrid } from "@/components/dashboard/CompanyBulletGrid";
 import { DataFreshnessBadge } from "@/components/dashboard/DataFreshnessBadge";
+import { AiExecutiveSummaryPanel } from "@/components/ai/AiExecutiveSummaryPanel";
 import type { ChartsData } from "@/components/dashboard/DashboardCharts";
+import type { CurrencyUnit } from "@/lib/formatters";
 
 const DashboardCharts = dynamic(
   () => import("@/components/dashboard/DashboardCharts").then((m) => ({ default: m.DashboardCharts })),
@@ -53,6 +55,7 @@ function DashboardContent() {
   const metricParam    = sp.get("metric");
 
   const [period, setPeriodState] = useState(periodParam ?? defaultPeriod());
+  const [unit,   setUnit]        = useState<CurrencyUnit>("millions");
 
   const [kpis,           setKpis]           = useState<KpiMetric[]>([]);
   const [chartsData,     setChartsData]     = useState<ChartsData | null>(null);
@@ -168,6 +171,22 @@ function DashboardContent() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Currency unit toggle */}
+          <div className="flex border border-ev-gray6 overflow-hidden text-xs">
+            {([ ["millions", "MM"], ["thousands", "M"], ["full", "#"] ] as [CurrencyUnit, string][]).map(([u, label], i) => (
+              <button
+                key={u}
+                onClick={() => setUnit(u)}
+                className={[
+                  "px-2.5 py-1.5 font-body font-medium",
+                  i > 0 ? "border-l border-ev-gray6" : "",
+                  unit === u ? "bg-ev-black text-white" : "bg-white text-ev-gray3 hover:bg-ev-beige2 hover:text-ev-black",
+                ].join(" ")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <input
             type="month"
             value={period.slice(0, 7)}
@@ -217,6 +236,7 @@ function DashboardContent() {
                 label={k.label}
                 value={k.value}
                 format={k.format as "currency" | "percentage" | "number"}
+                unit={unit}
                 vsPriorPct={VS_PRIOR_MAP[code]  ? kpiMap[VS_PRIOR_MAP[code]]?.value  : undefined}
                 vsBudgetPct={VS_BUDGET_MAP[code] ? kpiMap[VS_BUDGET_MAP[code]]?.value : undefined}
                 isActive={metricParam === code}
@@ -236,6 +256,7 @@ function DashboardContent() {
               label={k.label}
               value={k.value}
               format={k.format as "currency" | "percentage" | "number"}
+              unit={unit}
             />
           ))}
         </div>
@@ -245,6 +266,7 @@ function DashboardContent() {
       <CompanyBulletGrid
         period={period}
         companyIds={companyIdParam}
+        unit={unit}
         onCompanyClick={(id) => setFilter("companyId", companyIdParam === id ? null : id)}
         activeCompanyId={companyIdParam}
       />
@@ -259,12 +281,13 @@ function DashboardContent() {
       <CompanyRanking
         rows={ranking}
         loading={rankingLoading}
+        unit={unit}
         activeCompanyId={companyIdParam}
         onCompanyClick={(id) => setFilter("companyId", companyIdParam === id ? null : id)}
       />
 
       {/* ── Bloque 4: Variance Drivers ── */}
-      <VarianceDriversPanel period={period} companyIds={companyIdParam} />
+      <VarianceDriversPanel period={period} companyIds={companyIdParam} unit={unit} />
 
       {/* ── Bloque 5 & 6: Charts ── */}
       {chartsLoading ? (
