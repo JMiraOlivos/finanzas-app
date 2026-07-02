@@ -73,9 +73,10 @@ WITH
   -- ── Budget YTD: active versions, ALL line types ──────────────────────────────
   -- Handles both detail-level budget (mapped to individual accounts) and
   -- subtotal-level budget (mapped directly to RRHH, MARKETING, etc.)
+  -- NULL (not 0) when no budget data exists for a line, so "—" renders in the table.
   budget_all AS (
     SELECT a.id AS company_id, pl.code AS line_code,
-           COALESCE(SUM(bm.amount), 0) AS amount
+           SUM(bm.amount) AS amount
     FROM allowed a
     CROSS JOIN pnl_lines pl
     LEFT JOIN (
@@ -105,7 +106,7 @@ WITH
       pl.is_highlighted,
       COALESCE(ac.amount, 0) AS actual_ytd,
       COALESCE(ly.amount, 0) AS ly_ytd,
-      COALESCE(ba.amount, 0) AS budget_ytd
+      ba.amount              AS budget_ytd
     FROM allowed a
     CROSS JOIN pnl_lines pl
     LEFT JOIN actual_detail ac ON ac.company_id = a.id AND ac.line_code = pl.code
@@ -130,7 +131,10 @@ WITH
       pl.is_highlighted,
       COALESCE(SUM(d.actual_ytd), 0)                              AS actual_ytd,
       COALESCE(SUM(d.ly_ytd),     0)                              AS ly_ytd,
-      COALESCE(SUM(d.budget_ytd), 0) + COALESCE(MAX(ba.amount), 0) AS budget_ytd
+      CASE
+        WHEN SUM(d.budget_ytd) IS NULL AND MAX(ba.amount) IS NULL THEN NULL
+        ELSE COALESCE(SUM(d.budget_ytd), 0) + COALESCE(MAX(ba.amount), 0)
+      END                                                          AS budget_ytd
     FROM allowed a
     JOIN pnl_lines pl ON pl.line_type = 'subtotal' AND pl.show_in_report = TRUE
     LEFT JOIN detail d
@@ -198,20 +202,26 @@ WITH
       END AS ly_ytd,
       CASE
         WHEN pl.formula_key = 'EBITDA' THEN (
-          SELECT COALESCE(SUM(b.budget_ytd), 0) FROM base b WHERE b.company_id = a.id
+          SELECT CASE WHEN BOOL_OR(b.budget_ytd IS NOT NULL)
+                      THEN COALESCE(SUM(b.budget_ytd), 0) ELSE NULL END
+          FROM base b WHERE b.company_id = a.id
             AND b.line_code IN ('INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
               'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA','NO_OPERACIONALES'))
         WHEN pl.formula_key = 'RESULTADO_ANTES_IMP' THEN (
-          SELECT COALESCE(SUM(b.budget_ytd), 0) FROM base b WHERE b.company_id = a.id
+          SELECT CASE WHEN BOOL_OR(b.budget_ytd IS NOT NULL)
+                      THEN COALESCE(SUM(b.budget_ytd), 0) ELSE NULL END
+          FROM base b WHERE b.company_id = a.id
             AND b.line_code IN ('INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
               'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA',
               'NO_OPERACIONALES','INTERESES_DEPR'))
         WHEN pl.formula_key = 'RESULTADO_FINAL' THEN (
-          SELECT COALESCE(SUM(b.budget_ytd), 0) FROM base b WHERE b.company_id = a.id
+          SELECT CASE WHEN BOOL_OR(b.budget_ytd IS NOT NULL)
+                      THEN COALESCE(SUM(b.budget_ytd), 0) ELSE NULL END
+          FROM base b WHERE b.company_id = a.id
             AND b.line_code IN ('INGRESOS','GASTOS_VARIABLES','RRHH','MARKETING',
               'GASTOS_ADMIN','ASESORIAS','GASTOS_OFICINA','TECNOLOGIA',
               'NO_OPERACIONALES','INTERESES_DEPR','IMPUESTO'))
-        ELSE 0
+        ELSE NULL
       END AS budget_ytd
     FROM allowed a
     JOIN pnl_lines pl ON pl.line_type = 'calculated' AND pl.show_in_report = TRUE
