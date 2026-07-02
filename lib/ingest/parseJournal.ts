@@ -124,8 +124,13 @@ export function parseJournalBuffer(buffer: Buffer, filename: string): ParsedRow[
     dataRows = raw.slice(1);
     cm = colMap;
   } else {
-    // No headers detected. Sniff the format from the first data row.
-    const r0 = raw[0];
+    // No headers detected. Sniff the format from the first non-empty data row.
+    // Some files (e.g. ERP exports) have a blank/null row at the top before data starts.
+    let fmtOffset = 0;
+    while (fmtOffset < raw.length - 1 && raw[fmtOffset].every((v) => v === null || v === "")) {
+      fmtOffset++;
+    }
+    const r0 = raw[fmtOffset];
     if (!r0 || r0.length < 5) {
       throw new Error(`No se pueden detectar columnas en ${filename}. Formato desconocido.`);
     }
@@ -138,7 +143,7 @@ export function parseJournalBuffer(buffer: Buffer, filename: string): ParsedRow[
     const isFormatA = r0.length >= 10 && /^\d{4,}$/.test(col5.replace(/\./g, ""));
 
     if (isFormatA) {
-      dataRows = raw;
+      dataRows = raw.slice(fmtOffset);
       cm = {
         entryDate:      0,
         accountCode:    5,
@@ -151,7 +156,7 @@ export function parseJournalBuffer(buffer: Buffer, filename: string): ParsedRow[
       };
     } else {
       // Generic fallback: fecha | cuenta | nombre | glosa | debe | haber
-      dataRows = raw;
+      dataRows = raw.slice(fmtOffset);
       cm = {
         entryDate:      0,
         accountCode:    1,
