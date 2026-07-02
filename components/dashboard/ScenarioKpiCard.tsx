@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { formatCurrencyUnit, formatPercentage, type CurrencyUnit } from "@/lib/formatters";
 
 type Props = {
@@ -9,6 +10,7 @@ type Props = {
   vsBudgetPct?: number | null;
   onClick?: () => void;
   isActive?: boolean;
+  actions?: ReactNode;
 };
 
 function DeltaBadge({ value, label }: { value: number | null | undefined; label: string }) {
@@ -23,7 +25,7 @@ function DeltaBadge({ value, label }: { value: number | null | undefined; label:
   );
 }
 
-export function ScenarioKpiCard({ label, value, format, unit = "millions", vsPriorPct, vsBudgetPct, onClick, isActive }: Props) {
+export function ScenarioKpiCard({ label, value, format, unit = "millions", vsPriorPct, vsBudgetPct, onClick, isActive, actions }: Props) {
   const formatted =
     value === null ? "—"
     : format === "currency"   ? formatCurrencyUnit(value, unit)
@@ -46,10 +48,11 @@ export function ScenarioKpiCard({ label, value, format, unit = "millions", vsPri
       <p className={["text-2xl font-head tabular-nums leading-none", isNegative ? "text-ev-red" : "text-ev-black"].join(" ")}>
         {formatted}
       </p>
-      {hasBadges && (
-        <div className="flex flex-col gap-0.5 mt-auto pt-1 border-t border-ev-gray7">
+      {(hasBadges || actions) && (
+        <div className="mt-auto pt-1 border-t border-ev-gray7 space-y-0.5">
           <DeltaBadge value={vsPriorPct}  label="vs año ant." />
           <DeltaBadge value={vsBudgetPct} label="vs ppto." />
+          {actions && <div className="pt-1">{actions}</div>}
         </div>
       )}
     </div>

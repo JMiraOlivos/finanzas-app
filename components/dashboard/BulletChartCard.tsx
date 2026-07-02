@@ -1,6 +1,7 @@
 "use client";
 
 import { BulletChart, type BulletZone } from "./BulletChart";
+import { ExplainButton } from "@/components/ai/ExplainButton";
 import { formatCurrencyUnit, formatPercentage, type CurrencyUnit } from "@/lib/formatters";
 import type { CompanyBulletKpi } from "@/app/api/dashboard/bullets/route";
 
@@ -51,7 +52,12 @@ type Props = Pick<
   | "varianceVsTarget"
   | "varianceVsTargetPct"
   | "status"
-> & { unit?: CurrencyUnit };
+> & {
+  unit?: CurrencyUnit;
+  period?: string;
+  companyId?: string;
+  companyIds?: string | null;
+};
 
 export function BulletChartCard({
   metricCode,
@@ -64,16 +70,30 @@ export function BulletChartCard({
   varianceVsTargetPct,
   status,
   unit = "millions",
+  period,
+  companyId,
+  companyIds,
 }: Props) {
   const varPositive = varianceVsTarget !== null && varianceVsTarget >= 0;
   const zones = computeZones(target, metricCode);
 
   return (
     <div className="space-y-2">
-      {/* Label + attainment badge */}
+      {/* Label + attainment badge + explain */}
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-body font-medium text-ev-gray2">{metricLabel}</span>
-        <span className={["text-[10px] font-body font-medium px-2 py-0.5 whitespace-nowrap", STATUS_BADGE[status]].join(" ")}>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-body font-medium text-ev-gray2 truncate">{metricLabel}</span>
+          {period && companyId && (
+            <ExplainButton
+              period={period}
+              companyIds={companyIds}
+              targetType="bullet"
+              metricCode={metricCode}
+              companyId={companyId}
+            />
+          )}
+        </div>
+        <span className={["text-[10px] font-body font-medium px-2 py-0.5 whitespace-nowrap flex-shrink-0", STATUS_BADGE[status]].join(" ")}>
           {attainmentPct !== null ? formatPercentage(attainmentPct) : "Sin ppto"}
         </span>
       </div>

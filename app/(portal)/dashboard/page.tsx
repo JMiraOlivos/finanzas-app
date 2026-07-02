@@ -12,6 +12,7 @@ import { VarianceDriversPanel } from "@/components/dashboard/VarianceDriversPane
 import { CompanyBulletGrid } from "@/components/dashboard/CompanyBulletGrid";
 import { DataFreshnessBadge } from "@/components/dashboard/DataFreshnessBadge";
 import { AiExecutiveSummaryPanel } from "@/components/ai/AiExecutiveSummaryPanel";
+import { ExplainButton } from "@/components/ai/ExplainButton";
 import type { ChartsData } from "@/components/dashboard/DashboardCharts";
 import type { CurrencyUnit } from "@/lib/formatters";
 
@@ -241,6 +242,14 @@ function DashboardContent() {
                 vsBudgetPct={VS_BUDGET_MAP[code] ? kpiMap[VS_BUDGET_MAP[code]]?.value : undefined}
                 isActive={metricParam === code}
                 onClick={() => setFilter("metric", metricParam === code ? null : code)}
+                actions={(code === "REVENUE_YTD" || code === "EBITDA_YTD") ? (
+                  <ExplainButton
+                    period={period}
+                    companyIds={companyIdParam}
+                    targetType="kpi"
+                    metricCode={code}
+                  />
+                ) : undefined}
               />
             );
           })}

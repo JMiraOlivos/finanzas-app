@@ -119,6 +119,9 @@ export function CompanyBulletGrid({ period, companyIds, unit = "millions", onCom
                       varianceVsTargetPct={m.varianceVsTargetPct}
                       status={m.status}
                       unit={unit}
+                      period={period}
+                      companyId={g.companyId}
+                      companyIds={companyIds}
                     />
                   ))}
                 </div>

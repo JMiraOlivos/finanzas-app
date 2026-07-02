@@ -127,6 +127,31 @@ export type PeriodSummaryResponse = {
   generatedAt: string;
 };
 
+// ── Explain This response ─────────────────────────────────────────────────
+
+export type ExplainKeyNumber = {
+  label: string;
+  value: string;
+  change?: string;
+};
+
+export type ExplainDriver = {
+  label: string;
+  detail: string;
+  direction: "positive" | "negative" | "neutral";
+};
+
+export type ExplanationResponse = {
+  title: string;
+  explanation: string;
+  keyNumbers: ExplainKeyNumber[];
+  drivers: ExplainDriver[];
+  caveats: string[];
+  modelName: string;
+  promptVersion: string;
+  generatedAt: string;
+};
+
 // ── Full context pack ─────────────────────────────────────────────────────
 
 export type FinancialContextPack = {
